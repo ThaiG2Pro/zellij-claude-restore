@@ -3,12 +3,14 @@ name = "zellij-claude-sync"
 version = "0.1.0"
 edition = "2024"
 
-[lib]
-crate-type = ["cdylib"]
+# NOTE: zellij plugins are BINARY crates, not cdylib libs. register_plugin!
+# generates `fn main()`, and only a binary target emits the WASM `_start`
+# export that zellij's plugin loader requires (plugin_loader.rs:176). A cdylib
+# builds a reactor module with no `_start` → "could not find exported function".
 
 [dependencies]
-zellij-tile = "0.44.0"
-kdl = "6"
+zellij-tile = "=0.44.2"   # MUST match the zellij binary version exactly (ABI export skew otherwise)
+kdl = { version = "6", features = ["v1"] }   # zellij dumps KDL v1 syntax; need parse_v1/ensure_v1
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

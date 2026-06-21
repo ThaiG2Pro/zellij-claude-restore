@@ -1,0 +1,19 @@
+// OPTIONAL: keep zellij-claude-sync resident in every session.
+//
+// The `snap` fish function launches the plugin on demand (`zellij pipe --plugin …`),
+// so this is NOT required. Use it only if you'd rather the plugin already be loaded
+// (e.g. so you can trigger it with a bare `zellij pipe --name save -- <name>`).
+//
+// Install: copy to ~/.config/zellij/layouts/default.kdl and replace the absolute
+// plugin path below with yours (zellij does NOT expand ~ in layout files).
+
+layout {
+    // Your real working panes go here.
+    pane
+
+    // Resident plugin in a thin borderless strip. zellij has no true "hidden pane",
+    // so this is a 1-row bar; move/zoom it away if it bothers you.
+    pane size=1 borderless=true {
+        plugin location="file:/home/YOU/.config/zellij/plugins/zellij-claude-sync.wasm"
+    }
+}

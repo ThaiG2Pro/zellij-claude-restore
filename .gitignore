@@ -1,1 +1,5 @@
 /target
+
+# Local tooling / editor indexes (machine-specific, not project source)
+/.codegraph
+/.cursor
