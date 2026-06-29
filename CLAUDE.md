@@ -6,7 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Zellij plugin (Rust → WASM) that lets a developer **explicitly save a named workspace snapshot** capturing the Zellij layout **plus the Claude Code chat session ID running in each pane**, so that `zellij --layout <name>` after a reboot resumes the exact layout *and* the exact Claude sessions.
 
-The core problem: Zellij resurrection replays each pane's `command` from `/proc/<pid>/cmdline`, but `claude` launched bare (no `--session-id` in argv) spawns a *new* chat. argv is immutable after `execve()`, so the running session ID can't be recovered from the process. The fix enriches the saved layout KDL with `args "--session-id" "<uuid>"` per claude pane.
+The core problem: Zellij resurrection replays each pane's `command` from `/proc/<pid>/cmdline`, but `claude` launched bare (no resume flag in argv) spawns a *new* chat. argv is immutable after `execve()`, so the running session ID can't be recovered from the process. The fix enriches the saved layout KDL with `args "--resume" "<uuid>"` per claude pane.
+
+> **`--resume`, NOT `--session-id`.** Verified empirically (Jun 29): `claude --session-id <uuid>` is for *assigning* an ID to a brand-new session — if that UUID already exists it errors `Session ID … is already in use` and refuses to start. `claude --resume <uuid>` is the flag that re-opens an existing session. The plugin injects `--resume`; `pane_has_session_id()` treats either flag as "already pinned" so we don't double-inject.
 
 **`HANDOFF.md` is the authoritative design document** (research findings, rejected alternatives, decisions D1–D8, open questions Q1–Q6, phased plan). It is in Vietnamese. Read it before making non-trivial architecture changes — the chosen approach (explicit named snapshots via the `SaveLayout` API, not auto-tick race-writes) was deliberately picked over four rejected alternatives, and that reasoning should not be re-litigated by accident.
 
@@ -21,6 +23,7 @@ cargo build --release --target wasm32-wasip1
 - The artifact basename follows the package name: `zellij-claude-sync.wasm` (hyphen). The old cdylib build produced `zellij_claude_sync.wasm` (underscore) — that name is stale, don't reference it.
 - `zellij-tile` is pinned `=0.44.2` to match the zellij binary exactly (mise-managed `0.44.2`); a caret range resolves to a newer SDK and can skew the plugin ABI.
 - The `wasm32-wasip1` target must be installed (`rustup target add wasm32-wasip1`).
+- **Redeploying a rebuilt `.wasm` does NOT take effect in running sessions.** zellij caches the compiled plugin per session under `~/.cache/zellij/<session-uuid>/file:/<abs-wasm>/` (plus a global `~/.cache/zellij/file:/<abs-wasm>/`) and does **not** invalidate on file-content change, and a session that already loaded the plugin keeps the old instance in memory. After `cp …/zellij-claude-sync.wasm ~/.config/zellij/plugins/`, you MUST both (a) purge the cache: `find ~/.cache/zellij -type d -name 'zellij-claude-sync.wasm' -prune -exec rm -rf {} +`, and (b) test in a **freshly started** `zellij` session (not a reattach). The first `snap` in that new session recompiles the wasm (a few seconds) and may exceed `snap`'s `timeout 3` — just run `snap` again. Symptom of testing a stale plugin: code changes appear to have no effect. (`md5sum` the deployed file vs `target/wasm32-wasip1/release/…` to confirm the *file* is current; the cache is the separate culprit.)
 - There are no automated tests. Manual verification: build → `zellij pipe --plugin file:<abs-wasm> --name save -- <snapshot>` → inspect `~/.config/zellij/layouts/<snapshot>.kdl` → `zellij --layout <snapshot>`. Headless verification works via a `script`-provided PTY: `script -qfec "zellij -s <name> -n <layout.kdl>" /dev/null &` (use `-n`/`--new-session-with-layout`; plain `-l` may route to attach and fail with "There is no active session"). To exercise the plugin without an interactive permission prompt, pre-grant in `~/.cache/zellij/permissions.kdl` keyed by the plugin's **bare absolute path** (no `file:` prefix — `RunPluginLocation::File` Display is just the path):
   ```kdl
   "/abs/path/to/zellij-claude-sync.wasm" {
@@ -54,14 +57,16 @@ Single file implementing the `ZellijPlugin` trait. The save flow is **synchronou
 
 ### KDL enrichment — implemented and verified
 
-`enrich_claude_panes()` is the core feature and is **working end-to-end** (headless test: two bare `claude` panes in distinct cwds → `pipe save` → restore spawns each with its correct `claude --session-id <uuid>`). The flow inside `pipe()` is dump → `enrich_claude_panes(&kdl)` → `save_layout`.
+`enrich_claude_panes()` is the core feature and is **working end-to-end** (verified Jun 29 with a real interactive `claude` pane: `claude` running in `~/billing` → `snap` from another pane → `real4.kdl` carries `command="claude"` with `args "--resume" "<uuid>"` → `zellij --layout` re-opens the exact chat). The flow inside `pipe()` is dump → `enrich_claude_panes(&kdl)` → `save_layout`.
 
 How enrichment works (all in `src/main.rs`, deterministic and self-contained):
 - **Parse/serialize as KDL v1.** zellij dumps KDL **v1** syntax (it uses the kdl v4 crate). We depend on `kdl = { version = "6", features = ["v1"] }` and use `KdlDocument::parse_v1()` + `ensure_v1()`. The default `parse()` uses the v2 parser and **fails** on zellij's dump ("Failed to parse KDL document") — do not switch to it. On any parse failure the raw KDL is saved unchanged (graceful degradation).
 - **Match** `pane` nodes whose `command` **basename** is `claude` (so `/usr/bin/claude` matches too).
 - **Skip template subtrees** — `new_tab_template`, `tab_template`, `swap_tiled_layout`, `swap_floating_layout`. Those describe what to spawn for a *brand-new* tab; pinning them to an old session id would be wrong. Only the live `tab` panes get enriched.
 - **Resolve cwd.** A dumped pane's `cwd` is often **relative** (`cwd="api"`) against a layout-level `cwd "/home/user"` base node; `resolve_cwd()` joins them to an absolute path.
-- **Inject** `args "--session-id" "<uuid>"` (prepended if an `args` block already exists; panes already carrying `--session-id` are left untouched).
+- **Inject** `args "--resume" "<uuid>"` (prepended if an `args` block already exists; panes already carrying `--resume`/`--session-id` are left untouched). Prepending preserves any original args — note a pane launched as `claude <prompt>` keeps that trailing positional (`args "--resume" "<uuid>" "<prompt>"`), faithful to how it was started.
+- **Neutralize the snap pane.** `neutralize_snap_pane()` detects the pane that ran the `snap`/`zellij pipe … --name save` command itself (command basename `zellij` or `timeout`, args containing `save` + `pipe`/`zellij-claude-sync`) and strips its `command` + `args` so it restores as a plain shell. **Crucially it must also drop the `start_suspended` (and `close_on_exit`) CHILD nodes** — every command pane in a dump carries `start_suspended true` as a *child node* (not a property), and zellij rejects `start_suspended` on a command-less pane with `start_suspended can only be set if a command was specified`, failing the whole save. Without neutralizing, restore re-runs `snap`, which hangs on the never-closed CLI pipe and re-overwrites the snapshot mid-restore.
+- **`start_suspended true` stays on real command panes** (incl. claude). It is zellij's default for dumped command panes — on `zellij --layout` the pane waits for ENTER before running `claude --resume …` rather than auto-spawning. Expected; do not strip it from command-bearing panes.
 
 ### The SessionStart hook (`hooks/session-marker.py`)
 
@@ -84,7 +89,7 @@ Verify after install: start a fresh `claude` somewhere and check `/tmp/zellij-$(
 - `/tmp` is preopened **without** `FullHdAccess`, so no extra permission is needed (contrary to the HANDOFF's expectation).
 - Known limitation (HANDOFF Risk 3): two claude panes sharing one cwd collide on the same marker.
 
-Claude session storage for reference: `~/.claude/projects/<encoded-cwd>/<session-uuid>.jsonl`, append-only event log. Resume via `claude -r <uuid>` / `claude --session-id <uuid>`.
+Claude session storage for reference: `~/.claude/projects/<encoded-cwd>/<session-uuid>.jsonl`, append-only event log. Resume via `claude --resume <uuid>` (alias `claude -r <uuid>`). Do **not** use `claude --session-id <uuid>` to resume — it only assigns an ID to a *new* session and errors on an existing UUID.
 
 ## Verification status (HANDOFF §9 open questions)
 

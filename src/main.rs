@@ -105,7 +105,7 @@ fn enrich_nodes(nodes: &mut Vec<KdlNode>, inherited_base: Option<String>, in_tem
         let name = node.name().value().to_string();
         let entering_template = in_template || is_template_node(&name);
 
-        if !entering_template && name == "pane" {
+        if !entering_template && name == "pane" && !neutralize_snap_pane(node) {
             maybe_enrich_pane(node, scope_base.as_deref());
         }
 
@@ -113,6 +113,56 @@ fn enrich_nodes(nodes: &mut Vec<KdlNode>, inherited_base: Option<String>, in_tem
             enrich_nodes(children.nodes_mut(), scope_base.clone(), entering_template);
         }
     }
+}
+
+/// A pane that was running the `snap` command itself (`zellij pipe … --name save`,
+/// optionally wrapped in `timeout`) gets captured verbatim by the dump and would
+/// re-run the save on restore — hanging on the never-closed CLI pipe and
+/// re-overwriting the snapshot mid-restore. Detect it and strip its `command`/`args`
+/// so it restores as a plain shell pane (cwd/size/focus preserved). Returns true if
+/// the pane was neutralized.
+fn neutralize_snap_pane(node: &mut KdlNode) -> bool {
+    let is_wrapper = node
+        .entry("command")
+        .and_then(|e| e.value().as_string())
+        .map(|c| matches!(basename(c), "zellij" | "timeout"))
+        .unwrap_or(false);
+    if !is_wrapper {
+        return false;
+    }
+    let args: Vec<String> = node
+        .children()
+        .and_then(|doc| doc.nodes().iter().find(|n| n.name().value() == "args"))
+        .map(|n| {
+            n.entries()
+                .iter()
+                .filter_map(|e| e.value().as_string().map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
+    let joined = args.join(" ");
+    let is_snap = args.iter().any(|a| a == "save")
+        && (joined.contains("pipe") || joined.contains("zellij-claude-sync"));
+    if !is_snap {
+        return false;
+    }
+    // Drop `command` and every property that is only valid alongside a command
+    // (zellij rejects e.g. `start_suspended` on a command-less pane).
+    node.entries_mut().retain(|e| {
+        !matches!(
+            e.name().map(|n| n.value()),
+            Some("command") | Some("start_suspended") | Some("close_on_exit")
+        )
+    });
+    if let Some(children) = node.children_mut().as_mut() {
+        children.nodes_mut().retain(|n| {
+            !matches!(
+                n.name().value(),
+                "args" | "start_suspended" | "close_on_exit"
+            )
+        });
+    }
+    true
 }
 
 fn maybe_enrich_pane(node: &mut KdlNode, base_cwd: Option<&str>) {
@@ -170,9 +220,9 @@ fn pane_has_session_id(node: &KdlNode) -> bool {
         .map(|doc| {
             doc.nodes().iter().any(|n| {
                 n.name().value() == "args"
-                    && n.entries()
-                        .iter()
-                        .any(|e| e.value().as_string() == Some("--session-id"))
+                    && n.entries().iter().any(|e| {
+                        matches!(e.value().as_string(), Some("--resume") | Some("--session-id"))
+                    })
             })
         })
         .unwrap_or(false)
@@ -185,12 +235,12 @@ fn inject_session_id(node: &mut KdlNode, uuid: &str) {
         .iter_mut()
         .find(|n| n.name().value() == "args")
     {
-        // Prepend so --session-id leads any user-provided args.
+        // Prepend so --resume leads any user-provided args.
         args.entries_mut().insert(0, KdlEntry::new(uuid.to_string()));
-        args.entries_mut().insert(0, KdlEntry::new("--session-id"));
+        args.entries_mut().insert(0, KdlEntry::new("--resume"));
     } else {
         let mut args = KdlNode::new("args");
-        args.push(KdlEntry::new("--session-id"));
+        args.push(KdlEntry::new("--resume"));
         args.push(KdlEntry::new(uuid.to_string()));
         children.nodes_mut().push(args);
     }
