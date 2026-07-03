@@ -101,7 +101,9 @@ Verify: start a fresh `claude` somewhere, then check
 ```bash
 snap my-workspace              # save the current Zellij + Claude layout
 snap --manual my-workspace     # ...but restore panes suspended (wait for ENTER)
-snap-list                      # list saved snapshots
+snap-list                      # list snapshots — name · date · resumable panes
+snap-rm my-workspace           # delete a snapshot (accepts multiple names)
+snap-clean                     # delete ALL snapshots (prompts; -f to skip)
 zellij --layout my-workspace   # restore — claude panes resume via --resume
 ```
 
@@ -122,6 +124,12 @@ claude pane waits for ENTER too.
 **One-key snapshot.** Bind a key to snapshot without typing a name — see
 [`layouts/keybind.kdl.example`](layouts/keybind.kdl.example) (uses Zellij's
 `MessagePlugin` keybind action; restore with `zellij --layout quicksnap`).
+
+**Renamed / symlinked claude binary?** By default only a command whose basename is
+`claude` is enriched. If yours is e.g. `claude-code`, set `ZCS_CLAUDE_CMD=claude-code`
+(or, for the resident-plugin layout, `claude_command "claude-code"` in the plugin
+block — see [`layouts/default.kdl.example`](layouts/default.kdl.example)). A wrapper
+that runs claude as an *argument* (`npx claude`) is not detected.
 
 ## Notes & limitations
 

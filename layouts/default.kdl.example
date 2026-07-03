@@ -13,7 +13,14 @@ layout {
 
     // Resident plugin in a thin borderless strip. zellij has no true "hidden pane",
     // so this is a 1-row bar; move/zoom it away if it bothers you.
+    //
+    // Optional config (per-snapshot `snap --args …` still overrides these):
+    //   auto_enter "false"          → restore claude panes suspended by default
+    //   claude_command "claude-code" → treat a renamed binary as claude
     pane size=1 borderless=true {
-        plugin location="file:/home/YOU/.config/zellij/plugins/zellij-claude-sync.wasm"
+        plugin location="file:/home/YOU/.config/zellij/plugins/zellij-claude-sync.wasm" {
+            // auto_enter "true"
+            // claude_command "claude"
+        }
     }
 }

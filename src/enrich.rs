@@ -22,23 +22,45 @@ pub struct EnrichStats {
     pub parse_failed: bool,
 }
 
-/// Backwards-compatible convenience wrapper: enrich without auto-enter and discard
-/// the stats. This is the long-standing pure API the regression suite pins; the
-/// plugin itself calls [`enrich_layout`] for the auto-enter flag + stats.
+/// Tunables for enrichment.
+/// - `auto_enter`: drop `start_suspended` on pinned claude panes so they resume
+///   without ENTER (see [`enrich_layout`]).
+/// - `claude_command`: the command **basename** treated as Claude. Defaults to
+///   `"claude"`; override when the binary is renamed/symlinked (e.g. `claude-code`).
+///   Matched by basename only — a wrapper that runs claude as an *argument*
+///   (e.g. `npx claude`) is not detected.
+#[derive(Debug, Clone)]
+pub struct EnrichConfig<'a> {
+    pub auto_enter: bool,
+    pub claude_command: &'a str,
+}
+
+impl Default for EnrichConfig<'_> {
+    fn default() -> Self {
+        Self {
+            auto_enter: false,
+            claude_command: "claude",
+        }
+    }
+}
+
+/// Backwards-compatible convenience wrapper: enrich with default config (no
+/// auto-enter, command `claude`) and discard the stats. This is the long-standing
+/// pure API the regression suite pins; the plugin calls [`enrich_layout`] directly.
 // (Only the test suite calls this now — the wasm binary uses `enrich_layout` — so it
 // reads as dead code in the non-test build; kept as the documented pure entry point.)
 #[cfg_attr(not(test), allow(dead_code))]
 pub fn enrich_claude_panes(kdl: &str, resolve: &SessionResolver<'_>) -> String {
-    enrich_layout(kdl, resolve, false).0
+    enrich_layout(kdl, resolve, &EnrichConfig::default()).0
 }
 
 /// Parse the dumped layout KDL, inject `args "--resume" "<uuid>"` into every
-/// restorable `claude` pane whose session UUID can be resolved via `resolve`,
+/// restorable claude pane whose session UUID can be resolved via `resolve`,
 /// and return the re-serialized KDL plus an [`EnrichStats`] summary. On any parse
 /// failure the original KDL is returned unchanged (with `parse_failed = true`) so
 /// the snapshot is still saved (just without enrichment).
 ///
-/// When `auto_enter` is true, panes that end up with a resume id also have their
+/// When `cfg.auto_enter` is true, panes that end up with a resume id also have their
 /// `start_suspended` child dropped, so `claude --resume …` launches automatically
 /// on restore instead of waiting for ENTER. Only panes we recognize as claude AND
 /// can pin get auto-launched — every other command pane keeps the safe suspended
@@ -46,7 +68,7 @@ pub fn enrich_claude_panes(kdl: &str, resolve: &SessionResolver<'_>) -> String {
 pub fn enrich_layout(
     kdl: &str,
     resolve: &SessionResolver<'_>,
-    auto_enter: bool,
+    cfg: &EnrichConfig<'_>,
 ) -> (String, EnrichStats) {
     // zellij dumps KDL v1 syntax (it uses the kdl v4 crate), so parse and
     // re-serialize as v1 — a v2 round-trip would produce a layout zellij can't read.
@@ -67,14 +89,7 @@ pub fn enrich_layout(
         }
     };
     let mut stats = EnrichStats::default();
-    enrich_nodes(
-        doc.nodes_mut(),
-        None,
-        false,
-        auto_enter,
-        resolve,
-        &mut stats,
-    );
+    enrich_nodes(doc.nodes_mut(), None, false, cfg, resolve, &mut stats);
     doc.ensure_v1();
     (doc.to_string(), stats)
 }
@@ -92,12 +107,11 @@ pub(crate) fn is_template_node(name: &str) -> bool {
 /// Recursively walk the layout tree, enriching `claude` panes that hold live state.
 /// `inherited_base` is the nearest ancestor `cwd "…"` value, used to resolve
 /// relative pane `cwd` properties to absolute paths.
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn enrich_nodes(
     nodes: &mut [KdlNode],
     inherited_base: Option<String>,
     in_template: bool,
-    auto_enter: bool,
+    cfg: &EnrichConfig<'_>,
     resolve: &SessionResolver<'_>,
     stats: &mut EnrichStats,
 ) {
@@ -116,7 +130,7 @@ pub(crate) fn enrich_nodes(
         let entering_template = in_template || is_template_node(&name);
 
         if !entering_template && name == "pane" && !neutralize_snap_pane(node) {
-            maybe_enrich_pane(node, scope_base.as_deref(), auto_enter, resolve, stats);
+            maybe_enrich_pane(node, scope_base.as_deref(), cfg, resolve, stats);
         }
 
         if let Some(children) = node.children_mut().as_mut() {
@@ -124,7 +138,7 @@ pub(crate) fn enrich_nodes(
                 children.nodes_mut(),
                 scope_base.clone(),
                 entering_template,
-                auto_enter,
+                cfg,
                 resolve,
                 stats,
             );
@@ -185,14 +199,14 @@ pub(crate) fn neutralize_snap_pane(node: &mut KdlNode) -> bool {
 fn maybe_enrich_pane(
     node: &mut KdlNode,
     base_cwd: Option<&str>,
-    auto_enter: bool,
+    cfg: &EnrichConfig<'_>,
     resolve: &SessionResolver<'_>,
     stats: &mut EnrichStats,
 ) {
     let is_claude = node
         .entry("command")
         .and_then(|e| e.value().as_string())
-        .map(|cmd| basename(cmd) == "claude")
+        .map(|cmd| basename(cmd) == cfg.claude_command)
         .unwrap_or(false);
     if !is_claude {
         return;
@@ -202,7 +216,7 @@ fn maybe_enrich_pane(
     // It's already resumable, so honor auto-enter for it too.
     if pane_has_session_id(node) {
         stats.already_pinned += 1;
-        if auto_enter {
+        if cfg.auto_enter {
             drop_start_suspended(node);
         }
         return;
@@ -223,7 +237,7 @@ fn maybe_enrich_pane(
             stats.enriched += 1;
             // Auto-launch on restore ONLY for panes we could actually pin — a bare
             // `claude` with start_suspended dropped would auto-start a *new* chat.
-            if auto_enter {
+            if cfg.auto_enter {
                 drop_start_suspended(node);
             }
         }
@@ -308,6 +322,14 @@ mod tests {
     }
     fn resolver_none() -> impl Fn(&str) -> Option<String> {
         |_| None
+    }
+
+    // EnrichConfig with the given auto_enter and the default command ("claude").
+    fn cfg(auto_enter: bool) -> EnrichConfig<'static> {
+        EnrichConfig {
+            auto_enter,
+            claude_command: "claude",
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -1034,7 +1056,7 @@ mod tests {
     fn auto_enter_off_preserves_start_suspended() {
         // Default/back-compat behavior: with auto_enter=false the enriched claude
         // pane keeps `start_suspended`, so it waits for ENTER on restore.
-        let (result, _stats) = enrich_layout(CLAUDE_LAYOUT, &resolver_some(), false);
+        let (result, _stats) = enrich_layout(CLAUDE_LAYOUT, &resolver_some(), &cfg(false));
         assert!(
             result.contains("--resume"),
             "auto_enter=false must still inject --resume"
@@ -1049,7 +1071,7 @@ mod tests {
     fn auto_enter_on_drops_start_suspended_on_enriched_pane() {
         // With auto_enter=true a pane we pin loses `start_suspended`, so
         // `claude --resume …` launches automatically on restore.
-        let (result, stats) = enrich_layout(CLAUDE_LAYOUT, &resolver_some(), true);
+        let (result, stats) = enrich_layout(CLAUDE_LAYOUT, &resolver_some(), &cfg(true));
         assert!(
             result.contains("--resume"),
             "auto_enter=true must inject --resume"
@@ -1066,7 +1088,7 @@ mod tests {
         // Safety guarantee: a claude pane we CAN'T pin (no marker) keeps
         // start_suspended even with auto_enter=true — otherwise a bare `claude`
         // would auto-start a NEW chat on restore.
-        let (result, stats) = enrich_layout(CLAUDE_LAYOUT, &resolver_none(), true);
+        let (result, stats) = enrich_layout(CLAUDE_LAYOUT, &resolver_none(), &cfg(true));
         assert!(!result.contains("--resume"), "no marker → no --resume");
         assert!(
             result.contains("start_suspended"),
@@ -1081,7 +1103,7 @@ mod tests {
         // A non-claude command pane must keep start_suspended regardless of
         // auto_enter — we never auto-run arbitrary commands on restore.
         let input = "layout {\n    cwd \"/home/user\"\n    pane command=\"vim\" {\n        start_suspended true\n    }\n    pane command=\"claude\" {\n        start_suspended true\n    }\n}\n";
-        let (result, stats) = enrich_layout(input, &resolver_some(), true);
+        let (result, stats) = enrich_layout(input, &resolver_some(), &cfg(true));
         assert!(
             result.contains("command=\"vim\""),
             "vim pane must still be present"
@@ -1099,14 +1121,14 @@ mod tests {
     fn stats_count_already_pinned() {
         // A pane already carrying --resume is counted as already_pinned, not enriched.
         let input = "layout {\n    cwd \"/home/user\"\n    pane command=\"claude\" {\n        args \"--resume\" \"deadbeef\"\n        start_suspended true\n    }\n}\n";
-        let (_result, stats) = enrich_layout(input, &resolver_some(), false);
+        let (_result, stats) = enrich_layout(input, &resolver_some(), &cfg(false));
         assert_eq!(stats.already_pinned, 1);
         assert_eq!(stats.enriched, 0);
     }
 
     #[test]
     fn stats_parse_failed_flag_set_on_bad_kdl() {
-        let (result, stats) = enrich_layout("not { valid kdl !!!", &resolver_some(), true);
+        let (result, stats) = enrich_layout("not { valid kdl !!!", &resolver_some(), &cfg(true));
         assert!(stats.parse_failed, "parse_failed must be set on bad KDL");
         assert_eq!(
             result, "not { valid kdl !!!",
@@ -1120,11 +1142,56 @@ mod tests {
         // An already-pinned pane also gets start_suspended dropped under auto_enter,
         // so re-snapping a resumable layout keeps it auto-launching.
         let input = "layout {\n    cwd \"/home/user\"\n    pane command=\"claude\" {\n        args \"--resume\" \"deadbeef\"\n        start_suspended true\n    }\n}\n";
-        let (result, stats) = enrich_layout(input, &resolver_some(), true);
+        let (result, stats) = enrich_layout(input, &resolver_some(), &cfg(true));
         assert!(
             !result.contains("start_suspended"),
             "auto_enter must drop start_suspended on an already-pinned pane too"
         );
         assert_eq!(stats.already_pinned, 1);
+    }
+
+    #[test]
+    fn custom_claude_command_is_enriched() {
+        // A renamed/symlinked binary (e.g. claude-code) is enriched when configured.
+        let input = "layout {\n    cwd \"/home/user\"\n    pane command=\"claude-code\" {\n        start_suspended true\n    }\n}\n";
+        let cfg = EnrichConfig {
+            auto_enter: false,
+            claude_command: "claude-code",
+        };
+        let (result, stats) = enrich_layout(input, &resolver_some(), &cfg);
+        assert!(
+            result.contains("--resume"),
+            "configured command basename must be enriched"
+        );
+        assert_eq!(stats.enriched, 1);
+    }
+
+    #[test]
+    fn default_command_ignores_renamed_binary() {
+        // With the default config, a renamed binary is NOT treated as claude.
+        let input = "layout {\n    cwd \"/home/user\"\n    pane command=\"claude-code\" {\n        start_suspended true\n    }\n}\n";
+        let (result, stats) = enrich_layout(input, &resolver_some(), &EnrichConfig::default());
+        assert!(
+            !result.contains("--resume"),
+            "default command 'claude' must not match 'claude-code'"
+        );
+        assert_eq!(stats.enriched, 0);
+    }
+
+    #[test]
+    fn custom_command_absolute_path_matches_by_basename() {
+        // Basename match still applies to the configured command.
+        let input = "layout {\n    cwd \"/home/user\"\n    pane command=\"/opt/bin/claude-code\" {\n        start_suspended true\n    }\n}\n";
+        let cfg = EnrichConfig {
+            auto_enter: true,
+            claude_command: "claude-code",
+        };
+        let (result, stats) = enrich_layout(input, &resolver_some(), &cfg);
+        assert!(result.contains("--resume"));
+        assert!(
+            !result.contains("start_suspended"),
+            "auto_enter applies to the configured command too"
+        );
+        assert_eq!(stats.enriched, 1);
     }
 }

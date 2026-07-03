@@ -6,6 +6,21 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-07-03
+
+### Added
+- **Snapshot management:** `snap-rm <name>...` (delete named snapshots) and
+  `snap-clean` (delete all; prompts, `-f` to skip) in all three shells.
+- **Richer `snap-list`:** now shows each snapshot's date and resumable-pane count.
+- **Configurable claude command:** enrich a renamed/symlinked binary via
+  `ZCS_CLAUDE_CMD=claude-code` (or `claude_command "…"` in the resident-plugin
+  layout). Default stays `claude`. Matched by basename; arg-wrappers (`npx claude`)
+  are not detected.
+- **Configurable auto-enter default** via the plugin `load()` config
+  (`auto_enter "false"`); per-snapshot `--args` still overrides.
+- Pure API generalized to `enrich_layout(kdl, resolve, &EnrichConfig)`
+  (`EnrichConfig { auto_enter, claude_command }`); +3 unit tests (43 total).
+
 ## [0.2.0] — 2026-07-03
 
 ### Added
@@ -38,6 +53,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   tagged-release CI workflow.
 - Pure KDL-enrichment module (`src/enrich.rs`) with a 33-test regression suite.
 
-[Unreleased]: https://github.com/ThaiG2Pro/zellij-claude-restore/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/ThaiG2Pro/zellij-claude-restore/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/ThaiG2Pro/zellij-claude-restore/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ThaiG2Pro/zellij-claude-restore/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/ThaiG2Pro/zellij-claude-restore/releases/tag/v0.1.0

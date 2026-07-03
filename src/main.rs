@@ -12,13 +12,47 @@ use zellij_tile::prelude::*;
 /// `/tmp` is preopened unconditionally, so no `FullHdAccess` permission is needed.
 const MARKER_DIR: &str = "/tmp/claude-sessions";
 
+/// Plugin-config defaults, populated in `load()` from the layout's `plugin { … }`
+/// block. Per-invocation `--args` on `zellij pipe` override these (see `pipe`).
 #[cfg(not(test))]
-#[derive(Default)]
-struct State {}
+struct State {
+    /// Default for auto-enter when a pipe message doesn't set `auto_enter`.
+    auto_enter_default: bool,
+    /// Command basename treated as Claude (default "claude").
+    claude_command: String,
+}
+
+#[cfg(not(test))]
+impl Default for State {
+    fn default() -> Self {
+        Self {
+            auto_enter_default: true,
+            claude_command: "claude".to_string(),
+        }
+    }
+}
+
+#[cfg(not(test))]
+fn parse_truthy(v: &str) -> bool {
+    !matches!(v.trim(), "false" | "0" | "no" | "off")
+}
 
 #[cfg(not(test))]
 impl ZellijPlugin for State {
-    fn load(&mut self, _configuration: BTreeMap<String, String>) {
+    fn load(&mut self, configuration: BTreeMap<String, String>) {
+        // Optional defaults from the resident-plugin layout: `plugin location="…" {
+        // auto_enter "false"; claude_command "claude-code" }`. Per-snapshot `--args`
+        // still override these.
+        if let Some(v) = configuration.get("auto_enter") {
+            self.auto_enter_default = parse_truthy(v);
+        }
+        if let Some(v) = configuration
+            .get("claude_command")
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+        {
+            self.claude_command = v.to_string();
+        }
         // dump_session_layout / save_layout are synchronous request/response calls
         // (they block on host_run_plugin_command), so no event subscription is needed.
         request_permission(&[
@@ -37,22 +71,33 @@ impl ZellijPlugin for State {
 
             // Auto-enter (drop `start_suspended` on the claude panes we pin, so they
             // resume without a manual ENTER) is ON by default — that's the whole point
-            // of the tool. Disable per-snapshot with `--args auto_enter=false`.
+            // of the tool. Per-snapshot override: `--args auto_enter=false`.
             let auto_enter = pipe_message
                 .args
                 .get("auto_enter")
-                .map(|v| v != "false" && v != "0" && v != "no")
-                .unwrap_or(true);
+                .map(|v| parse_truthy(v))
+                .unwrap_or(self.auto_enter_default);
+
+            // Command basename to treat as Claude — from `--args claude_command=…`,
+            // else the load()-config default, else "claude".
+            let claude_command = pipe_message
+                .args
+                .get("claude_command")
+                .map(|s| s.trim())
+                .filter(|s| !s.is_empty())
+                .unwrap_or(self.claude_command.as_str());
+
+            let cfg = enrich::EnrichConfig {
+                auto_enter,
+                claude_command,
+            };
 
             // dump_session_layout() returns the layout KDL synchronously — the result
             // IS the layout; it does NOT arrive later as a CustomMessage event.
             match dump_session_layout() {
                 Ok((kdl, _metadata)) => {
-                    let (enriched, stats) = enrich::enrich_layout(
-                        &kdl,
-                        &|cwd: &str| resolve_session_uuid(cwd),
-                        auto_enter,
-                    );
+                    let (enriched, stats) =
+                        enrich::enrich_layout(&kdl, &|cwd: &str| resolve_session_uuid(cwd), &cfg);
                     match save_layout(&name, &enriched, true) {
                         Ok(()) => {
                             eprintln!(

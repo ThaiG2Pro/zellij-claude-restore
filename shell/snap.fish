@@ -25,9 +25,18 @@ function snap --description 'Save a Zellij + Claude workspace snapshot'
         return 1
     end
 
-    set -l pipe_args
+    # Collect key=value pairs into a single comma-separated --args value.
+    set -l kv
     if set -q _flag_manual; or set -q ZCS_NO_AUTO_ENTER
-        set pipe_args --args auto_enter=false
+        set -a kv auto_enter=false
+    end
+    # Treat a renamed/symlinked claude binary as claude (e.g. ZCS_CLAUDE_CMD=claude-code).
+    if set -q ZCS_CLAUDE_CMD
+        set -a kv claude_command=$ZCS_CLAUDE_CMD
+    end
+    set -l pipe_args
+    if test (count $kv) -gt 0
+        set pipe_args --args (string join ',' $kv)
     end
 
     # The plugin writes a one-line JSON status here (guest /tmp/claude-sessions maps
@@ -64,11 +73,56 @@ function __snap_report --argument-names status_file
     end
 end
 
-function snap-list --description 'List saved Zellij snapshots'
-    test -d ~/.config/zellij/layouts/; or return 0
-    for f in ~/.config/zellij/layouts/*.kdl
-        basename $f .kdl
+function snap-list --description 'List saved Zellij snapshots (name · date · resumable panes)'
+    set -l dir ~/.config/zellij/layouts
+    test -d $dir; or return 0
+    set -l any 0
+    for f in $dir/*.kdl
+        test -e $f; or continue
+        set any 1
+        set -l nm (basename $f .kdl)
+        set -l resumable (grep -o -- '--resume' $f 2>/dev/null | wc -l | string trim)
+        set -l when (date -r $f '+%Y-%m-%d %H:%M' 2>/dev/null; or echo '?')
+        printf '%-24s %s  %s resumable\n' $nm $when $resumable
     end
+    test $any -eq 1; or echo "(no snapshots yet — run `snap <name>`)"
+end
+
+function snap-rm --description 'Delete one or more saved snapshots'
+    if test (count $argv) -eq 0
+        echo "Usage: snap-rm <name>..."
+        return 1
+    end
+    set -l dir ~/.config/zellij/layouts
+    set -l rc 0
+    for nm in $argv
+        set -l f $dir/$nm.kdl
+        if test -f $f
+            rm -f $f; and echo "✓ removed: $nm"
+        else
+            echo "✗ no such snapshot: $nm"
+            set rc 1
+        end
+    end
+    return $rc
+end
+
+function snap-clean --description 'Delete ALL saved snapshots (use -f to skip the prompt)'
+    set -l dir ~/.config/zellij/layouts
+    test -d $dir; or return 0
+    set -l files $dir/*.kdl
+    if not test -e $files[1]
+        echo "(nothing to clean)"
+        return 0
+    end
+    if test "$argv[1]" != -f
+        read -l -P "Remove "(count $files)" snapshot(s)? [y/N] " ans
+        if not string match -qi 'y' -- $ans
+            echo "aborted"
+            return 1
+        end
+    end
+    rm -f $files; and echo "✓ removed "(count $files)" snapshot(s)"
 end
 
 function snap-load --description 'Restore a snapshot as a new tab in the current Zellij session'

@@ -28,10 +28,17 @@ snap() {
         return 1
     fi
 
-    local pipe_args=()
+    # Collect key=value pairs into a single comma-separated --args value.
+    local kv=""
     if [ -n "$manual" ] || [ -n "${ZCS_NO_AUTO_ENTER:-}" ]; then
-        pipe_args=(--args auto_enter=false)
+        kv="auto_enter=false"
     fi
+    # Treat a renamed/symlinked claude binary as claude (e.g. ZCS_CLAUDE_CMD=claude-code).
+    if [ -n "${ZCS_CLAUDE_CMD:-}" ]; then
+        kv="${kv:+$kv,}claude_command=$ZCS_CLAUDE_CMD"
+    fi
+    local pipe_args=()
+    [ -n "$kv" ] && pipe_args=(--args "$kv")
 
     # The plugin writes a one-line JSON status here (guest /tmp/claude-sessions maps
     # to host $ZELLIJ_TMP_DIR = /tmp/zellij-<uid>). Clear stale status before saving.
@@ -69,13 +76,60 @@ __snap_report() {
     fi
 }
 
-# List saved Zellij snapshots. (N) is the zsh nullglob qualifier — no match → no error.
+# List saved Zellij snapshots (name · date · resumable panes).
+# (N) is the zsh nullglob qualifier — no match → no error.
 snap-list() {
-    [ -d "$HOME/.config/zellij/layouts" ] || return 0
-    local f
-    for f in "$HOME"/.config/zellij/layouts/*.kdl(N); do
-        basename "$f" .kdl
+    local dir="$HOME/.config/zellij/layouts"
+    [ -d "$dir" ] || return 0
+    local f any=0
+    for f in "$dir"/*.kdl(N); do
+        any=1
+        local nm resumable when
+        nm="$(basename "$f" .kdl)"
+        resumable="$(grep -o -- '--resume' "$f" 2>/dev/null | wc -l | tr -d ' ')"
+        when="$(date -r "$f" '+%Y-%m-%d %H:%M' 2>/dev/null || echo '?')"
+        printf '%-24s %s  %s resumable\n' "$nm" "$when" "$resumable"
     done
+    [ "$any" = 1 ] || echo "(no snapshots yet — run 'snap <name>')"
+}
+
+# Delete one or more saved snapshots.
+snap-rm() {
+    if [ "$#" -eq 0 ]; then
+        echo "Usage: snap-rm <name>..."
+        return 1
+    fi
+    local dir="$HOME/.config/zellij/layouts" rc=0 nm
+    for nm in "$@"; do
+        if [ -f "$dir/$nm.kdl" ]; then
+            rm -f "$dir/$nm.kdl" && echo "✓ removed: $nm"
+        else
+            echo "✗ no such snapshot: $nm"
+            rc=1
+        fi
+    done
+    return "$rc"
+}
+
+# Delete ALL saved snapshots (use -f to skip the prompt).
+snap-clean() {
+    local dir="$HOME/.config/zellij/layouts"
+    [ -d "$dir" ] || return 0
+    local files=() f
+    for f in "$dir"/*.kdl(N); do files+=("$f"); done
+    if [ "${#files[@]}" -eq 0 ]; then
+        echo "(nothing to clean)"
+        return 0
+    fi
+    if [ "$1" != "-f" ]; then
+        printf 'Remove %d snapshot(s)? [y/N] ' "${#files[@]}"
+        local ans; read -r ans
+        case "$ans" in
+            [yY]*) ;;
+            *) echo "aborted"; return 1 ;;
+        esac
+    fi
+    rm -f "${files[@]}" && echo "✓ removed ${#files[@]} snapshot(s)"
 }
 
 # Restore a snapshot as a new tab in the current Zellij session.
