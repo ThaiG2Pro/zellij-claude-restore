@@ -35,16 +35,35 @@ impl ZellijPlugin for State {
                 .filter(|p| !p.is_empty())
                 .unwrap_or_else(|| "unnamed".to_string());
 
+            // Auto-enter (drop `start_suspended` on the claude panes we pin, so they
+            // resume without a manual ENTER) is ON by default — that's the whole point
+            // of the tool. Disable per-snapshot with `--args auto_enter=false`.
+            let auto_enter = pipe_message
+                .args
+                .get("auto_enter")
+                .map(|v| v != "false" && v != "0" && v != "no")
+                .unwrap_or(true);
+
             // dump_session_layout() returns the layout KDL synchronously — the result
             // IS the layout; it does NOT arrive later as a CustomMessage event.
             match dump_session_layout() {
                 Ok((kdl, _metadata)) => {
-                    let enriched =
-                        enrich::enrich_claude_panes(&kdl, &|cwd: &str| resolve_session_uuid(cwd));
+                    let (enriched, stats) = enrich::enrich_layout(
+                        &kdl,
+                        &|cwd: &str| resolve_session_uuid(cwd),
+                        auto_enter,
+                    );
                     match save_layout(&name, &enriched, true) {
-                        Ok(()) => eprintln!("[zellij-claude-sync] saved snapshot '{}'", name),
+                        Ok(()) => {
+                            eprintln!(
+                                "[zellij-claude-sync] saved '{}' — {} enriched, {} already pinned, {} missing marker",
+                                name, stats.enriched, stats.already_pinned, stats.missing_marker
+                            );
+                            write_status(&name, &stats, true);
+                        }
                         Err(e) => {
-                            eprintln!("[zellij-claude-sync] save_layout('{}') failed: {}", name, e)
+                            eprintln!("[zellij-claude-sync] save_layout('{}') failed: {}", name, e);
+                            write_status(&name, &stats, false);
                         }
                     }
                 }
@@ -64,6 +83,22 @@ impl ZellijPlugin for State {
 
 #[cfg(not(test))]
 register_plugin!(State);
+
+/// Write a one-line JSON status file the `snap` shell helper reads to report what
+/// actually happened (instead of only checking that the snapshot file exists). Path
+/// is guest `/tmp/claude-sessions/.last-save.json` = host
+/// `/tmp/zellij-<uid>/claude-sessions/.last-save.json`. Best-effort: any I/O error
+/// is ignored — the snapshot save is what matters, feedback is a bonus.
+#[cfg(not(test))]
+fn write_status(name: &str, stats: &enrich::EnrichStats, ok: bool) {
+    let json = format!(
+        "{{\"ok\":{},\"name\":{:?},\"enriched\":{},\"already_pinned\":{},\"missing_marker\":{},\"parse_failed\":{}}}\n",
+        ok, name, stats.enriched, stats.already_pinned, stats.missing_marker, stats.parse_failed
+    );
+    let path = format!("{}/.last-save.json", MARKER_DIR);
+    let _ = std::fs::create_dir_all(MARKER_DIR);
+    let _ = std::fs::write(&path, json);
+}
 
 /// Read the Claude session UUID for a given absolute cwd from its marker file.
 /// Marker key = cwd with `/` replaced by `-` (matching Claude's own

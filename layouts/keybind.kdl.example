@@ -1,0 +1,26 @@
+// OPTIONAL: bind a key to snapshot without typing `snap <name>`.
+//
+// Zellij's `MessagePlugin` keybind action pipes straight to the plugin — same
+// `name "save"` + payload the `snap` shell helper sends, but from a keypress and
+// WITHOUT the blocking `zellij pipe` CLI call (so no timeout hang).
+//
+// The trade-off called out in ROADMAP.md: a keybind has no argument, so it can't
+// prompt for a name. The pragmatic fix is a fixed, well-known name (here
+// "quicksnap") that you restore with `zellij --layout quicksnap`. Keep `snap
+// <name>` for named snapshots; use the key for a fast "checkpoint now".
+//
+// Install: merge the `keybinds` block into ~/.config/zellij/config.kdl and replace
+// the absolute plugin path (zellij does NOT expand ~ in config/layout files).
+// Add `auto_enter "false"` under the braces to restore panes suspended.
+
+keybinds {
+    shared_except "locked" {
+        // Ctrl y → save a snapshot named "quicksnap"
+        bind "Ctrl y" {
+            MessagePlugin "file:/home/YOU/.config/zellij/plugins/zellij-claude-sync.wasm" {
+                name "save"
+                payload "quicksnap"
+            }
+        }
+    }
+}
