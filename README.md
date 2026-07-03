@@ -8,6 +8,11 @@ Save a named **Zellij workspace snapshot** that captures the layout **plus the C
 chat session running in each pane** — so `zellij --layout <name>` after a reboot brings back
 the exact panes *and* resumes the exact Claude conversations.
 
+> Think of it as the **Zellij counterpart to [`tmux-assistant-resurrect`](https://github.com/timvw/tmux-assistant-resurrect)**:
+> same idea (a `SessionStart` hook records each session id; restore re-runs `claude --resume`),
+> but built for Zellij — it enriches Zellij's own layout KDL instead of bolting a sidecar onto
+> tmux-resurrect. See [Prior art](#prior-art).
+
 ```console
 $ snap my-workspace
 ✓ saved snapshot: my-workspace
@@ -141,6 +146,32 @@ that runs claude as an *argument* (`npx claude`) is not detected.
   rebuild until you purge the cache and start a fresh session — see `CLAUDE.md`.
 - `snap` from a *separate* pane than your claude panes; the snap pane is auto-neutralized to a
   plain shell on restore.
+
+## Prior art
+
+Persisting AI-assistant sessions across a multiplexer restart isn't a new idea — but the existing
+tools target **tmux** or **cmux**, not Zellij:
+
+- [**tmux-assistant-resurrect**](https://github.com/timvw/tmux-assistant-resurrect) — the closest
+  relative. Hooks tmux-resurrect's save/restore and rebuilds `claude --resume` (also OpenCode, Codex,
+  Pi, Grok) from a `SessionStart` hook + a JSON sidecar. tmux only.
+- [**tmux-claude-resurrect**](https://github.com/mikedyan/tmux-claude-resurrect) — resumes Claude into
+  the matching tmux window by name. tmux only.
+- [**cmux-session-manager**](https://github.com/ericblue/cmux-session-manager) — snapshot/restore cmux
+  workspaces with Claude resumption. cmux only.
+
+The Zellij plugins that mention Claude do something *different*:
+[zellaude](https://github.com/ishefi/zellaude) and
+[claude-code-zellij-status](https://github.com/thoo/claude-code-zellij-status) are status-bar/activity
+indicators, and [zellij-claude](https://github.com/UrosNikolic/zellij-claude) switches between
+*live* sessions — none restore conversations across a restart.
+
+`zellij-claude-restore` fills that gap for Zellij, and does it *natively*: it enriches Zellij's own
+layout KDL (so restore is just `zellij --layout <name>`) rather than wrapping an external
+save/restore engine. The convergent design with tmux-assistant-resurrect — a `SessionStart` hook plus
+`--resume` — is a good sign the approach is sound. (Upstream, Claude Code
+[issue #34829](https://github.com/anthropics/claude-code/issues/34829) tracks the still-open request
+to expose the session id for exactly this use case.)
 
 ## Building manually
 
