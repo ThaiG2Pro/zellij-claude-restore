@@ -1,10 +1,3 @@
-# Developer Role Memory — Cross-Spec Lessons
-
-Accumulated across changes. Each section is a reusable lesson for future builds.
-Append-only: never delete or overwrite an existing `## ` section.
-
----
-
 ## 2026-06-30 — add-unit-tests: WASM binary crate + `cargo test` on native host requires `#[cfg(not(test))]` guards
 
 **Context:** Adding inline `#[cfg(test)]` tests to a Rust binary crate that depends on `zellij_tile`

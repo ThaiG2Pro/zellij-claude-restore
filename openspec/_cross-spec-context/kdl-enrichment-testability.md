@@ -1,7 +1,3 @@
-# Cross-Spec Context
-
-Knowledge bridge agents read when starting a NEW change. Append-only — one block per change at S3 done.
-
 ## add-unit-tests — kdl-enrichment-testability (S3 done: 2026-06-30)
 ### Dependencies (from other changes)
 - None (first change in this repo's OpenSpec workspace).

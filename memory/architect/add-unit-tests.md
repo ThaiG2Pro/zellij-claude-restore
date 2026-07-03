@@ -1,10 +1,3 @@
-# Architect Role Memory — Cross-Spec Lessons
-
-Accumulated across changes. Each section is a reusable lesson for future designs.
-Append-only: never delete or overwrite an existing `## ` section.
-
----
-
 ## 2026-06-30 — add-unit-tests: inject the host dependency as a borrowed closure, not a trait, to make a host-coupled module unit-testable
 
 **Context:** Designing how to make a module testable on the native host when its only impurity is a
