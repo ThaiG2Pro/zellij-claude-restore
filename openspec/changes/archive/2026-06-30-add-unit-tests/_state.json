@@ -1,0 +1,113 @@
+{
+  "ticket_id": null,
+  "feature_slug": "add-unit-tests",
+  "change_name": "add-unit-tests",
+  "type": "feature",
+  "rigor": "lite",
+  "testcase_export": "none",
+  "phases": [
+    "S1",
+    "S2",
+    "S3",
+    "S4",
+    "S5",
+    "S6"
+  ],
+  "isolation": {
+    "method": "branch",
+    "branch": "feature/add-unit-tests",
+    "worktree_path": null,
+    "base_branch": "main"
+  },
+  "current_phase": "S6",
+  "gates": {
+    "S1": "passed",
+    "S2": "passed",
+    "S3": "passed",
+    "S4": "passed",
+    "S5": "passed"
+  },
+  "convergence": {},
+  "last_updated": "2026-06-30",
+  "last_agent": "developer",
+  "phase_history": [
+    {
+      "phase": "S1",
+      "agent": "analyst",
+      "date": "2026-06-30",
+      "summary": "Requirements intake — proposal.md + Non-Goals + Assumptions A1-A8 + 14 edge cases."
+    },
+    {
+      "phase": "S2",
+      "agent": "analyst",
+      "date": "2026-06-30",
+      "summary": "S2 functional spec complete: capability kdl-enrichment-testability (28 ACs / 10 BRs / 4 INTs). Pure subset extracted to src/enrich.rs; regression fixtures; parity = byte-identical enrich_claude_panes output (AC-tests-007); injected resolver (INT-tests-003, seam deferred to S3); push/PR CI (4 cmds, no coverage gate); validate --strict PASS."
+    },
+    {
+      "phase": "S3",
+      "agent": "architect",
+      "date": "2026-06-30",
+      "summary": "S3 technical design complete. 5 ADRs: ADR-001 resolver seam = borrowed closure (Fn cwd returns Option uuid) threaded through enrich_claude_panes/enrich_nodes/maybe_enrich_pane (rejected trait + cfg-swap); ADR-002 inline cfg(test) mod tests; ADR-003 new ci.yml push/PR single job build+fmt+clippy+test, NO coverage gate; ADR-004 verbatim move + fixtures from current behavior + mandatory headless-PTY round-trip at S4; ADR-005 logging at I/O boundary. openapi.yaml=N/A, DB=N/A. 6 tasks, 2 checkpoints. openspec validate --strict PASS. No critical gaps; no S2 return."
+    },
+    {
+      "phase": "S4",
+      "agent": "developer",
+      "date": "2026-06-30",
+      "summary": "S4 build complete. Created src/enrich.rs (8 functions verbatim, SessionResolver closure seam, 33 inline tests). Re-wired src/main.rs (mod enrich; + #[cfg(not(test))] guards for WASI linker isolation). Added .github/workflows/ci.yml (push/PR, build+fmt+clippy+test, no coverage gate). All cargo checks pass: WASM build OK, cargo test 33/33 passed, fmt --check clean, clippy -D warnings clean. DEV-001 (minor): #[cfg(not(test))] guards needed to isolate zellij_tile host symbols from native linker. Parity round-trip confirmed PASS (human-confirmed 2026-06-30)."
+    },
+    {
+      "phase": "S5",
+      "agent": "qa",
+      "date": "2026-06-30",
+      "summary": "QA PASS. GO decision. 33/33 tests independently confirmed. 28/28 ACs verified. 4 regression areas (BR-tests-008) strongly covered. All invariants confirmed (synchronous save, binary crate, KDL v1, --resume, graceful degradation, enrich.rs free of zellij_tile+std::fs). Security audit PASS (no secrets, no PII, STRIDE N/A). 1 Low finding (F-001: shallow contains() assertions on AC-tests-007 parity and empty-input no-panic — advisory, not a blocker). DEV-001 and IMPL-003 deviations: behavior-neutral confirmed. CI structure correct; release.yml unchanged. Parity round-trip: human-confirmed PASS, provenance recorded."
+    },
+    {
+      "phase": "S4-fix",
+      "agent": "developer",
+      "date": "2026-06-30",
+      "summary": "F-001 resolved. Replaced 3 weak assertions in src/enrich.rs #[cfg(test)] mod tests: (1) parity_claude_pane_enriched_with_resume_ac_tests_007 now uses assert_eq!(result, PARITY_EXPECTED) against a const byte-identical expected string; (2) empty_input_no_panic_ac_tests_009 now asserts assert_eq!(result, \"\"); (3) whitespace_only_input_no_panic_ac_tests_009 now asserts assert_eq!(result, \"   \\n\\t  \"). No production code changed. cargo test 33/33 PASS; fmt --check PASS; clippy -D warnings PASS."
+    },
+    {
+      "phase": "S5-retest",
+      "agent": "qa",
+      "date": "2026-06-30",
+      "summary": "F-001 retest PASS. cargo test 33/33 (QA independent run), fmt --check PASS, clippy -D warnings PASS. PARITY_EXPECTED verified non-trivial: contains escaped cwd (\\/home\\/user) and injected args \"--resume\" child node, genuinely distinct from PARITY_INPUT. Empty/whitespace tests now assert returned string value. No production code touched. F-001 CLOSED. GO reaffirmed — 0 Critical/High open bugs, 28/28 ACs verified."
+    },
+    {
+      "phase": "S6",
+      "agent": "developer",
+      "date": "2026-06-30",
+      "summary": "S6 release complete. release.md written covering: release notes (28 AC-IDs, 4 regression areas, parity-identical runtime), migration checklist (DB N/A, no dep changes, docs-sync advisory for context/stack.md + CLAUDE.md), rollback plan (git revert — 3 files, clean), post-deploy smoke (cache purge required + fresh Zellij session), deploy strategy (PR merge to main; commit feat(enrich): extract pure KDL module + regression tests + push/PR CI). CPP baton updated: IMPL-006 appended to _decisions.jsonl; _handoff.md S6 generated; _state.json S6 phase entry added; memory_writeback.developer=nothing-reusable; next_action.agent=null. Change archived via openspec archive."
+    }
+  ],
+  "active_concerns": [],
+  "terminology": {
+    "kdl-enrichment-testability": "The single capability for this change: extract a host-testable pure KDL module, add regression unit tests, and add push/PR CI.",
+    "pure subset": "The eight pure string-in string-out functions (enrich_claude_panes, enrich_nodes, neutralize_snap_pane, resolve_cwd, pane_has_session_id, inject_session_id, basename, is_template_node) testable on the native host without Zellij.",
+    "injected resolver": "The session-marker lookup supplied to enrichment as a parameter or trait so the pure module needs no /tmp or host access; exact mechanism is an S3 decision (INT-tests-003).",
+    "parity": "Byte-identical enrich_claude_panes output for identical input with the resolver held constant; the acceptance bar since this is a refactor-for-testability, not a behavior change (AC-tests-007).",
+    "I/O seam": "The boundary separating the pure tree-walk and serialization from host I/O (eprintln! logging plus std::fs marker read); drawing it cleanly lets enrich.rs drop the zellij-tile dep.",
+    "parity bootstrap risk": "The HIGH risk that the test-enabling refactor is itself untested, so a drift could be baked into the very fixtures meant to catch regressions."
+  },
+  "next_action": {
+    "agent": null,
+    "command": "/s6 add-unit-tests",
+    "routes_to": "developer /s6",
+    "prerequisite": "S5 QA gate approval by orchestrator (F-001 fix verified, GO reaffirmed)",
+    "priority_reading": [
+      "qa-report.md §12 Retest and §13 Decision — F-001 CLOSED, GO confirmed",
+      "_handoff.md — S5→S6 QA handoff",
+      "CLAUDE.md §Redeploying — cache purge required after WASM deploy"
+    ],
+    "watch_items": [
+      "Cache purge required before testing in new session: find ~/.cache/zellij -type d -name 'zellij-claude-sync.wasm' -prune -exec rm -rf {} +",
+      "Commit src/enrich.rs + modified src/main.rs + .github/workflows/ci.yml as a single atomic commit.",
+      "Follow R-GIT-001 commit message format: feat(enrich): extract pure KDL module + regression tests + CI"
+    ]
+  },
+  "parity_roundtrip": "PASS — human-confirmed 2026-06-30",
+  "memory_writeback": {
+    "qa": "appended",
+    "developer": "nothing-reusable"
+  }
+}

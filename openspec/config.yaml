@@ -1,0 +1,83 @@
+schema: spec-driven
+
+# Project context (filled by the onboarder — distilled from context/project.md, stack.md, conventions.md).
+context: |
+  zellij-claude-sync — a Zellij plugin (Rust -> WASM, wasm32-wasip1) that saves a named workspace
+  snapshot capturing the layout PLUS the Claude Code chat session in each pane, so `zellij --layout
+  <name>` resumes the exact layout and re-opens the exact Claude conversations after a reboot.
+  Stack: Rust (edition 2024) BINARY crate (NOT cdylib — only a binary emits the WASM `_start` export
+  Zellij's loader needs); zellij-tile pinned =0.44.2; kdl v6 (v1 feature); plus a Python3 SessionStart
+  hook and fish/bash/zsh shell helpers. No HTTP API, no DB, no ORM. Pure KDL-enrichment logic lives in
+  src/enrich.rs (zellij-tile-free) with 33 host unit tests via `cargo test`; the WASI host flow
+  (pipe/load/dump/save in src/main.rs) stays manual / headless-PTY only. Build: `cargo build --release
+  --target wasm32-wasip1`. CI = GitHub Actions: ci.yml (build + fmt --check + clippy -D warnings +
+  cargo test on push/PR) and release.yml (attach .wasm on v* tags).
+  Architecture: two-module plugin — src/main.rs implements ZellijPlugin (host I/O), src/enrich.rs holds
+  the pure KDL walk with the marker resolver injected as a borrowed closure (SessionResolver seam).
+  SYNCHRONOUS save flow in pipe() — dump_session_layout() -> enrich_claude_panes() -> save_layout();
+  never reintroduce the async CustomMessage pattern. Enrichment injects `args "--resume" "<uuid>"` (NOT
+  --session-id) per claude pane, looked up from cwd-keyed marker files; skips template subtrees;
+  neutralizes the snap pane.
+  Conventions: no REST/JSON envelope or HTTP status codes; success is confirmed by snapshot-file presence;
+  diagnostics via eprintln!("[zellij-claude-sync] ..."). Parse KDL with parse_v1/ensure_v1 (v2 parse fails).
+  Authoritative design doc: HANDOFF.md (Vietnamese); build/runtime gotchas: CLAUDE.md.
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Kiro SDLC kit — canonical per-artifact rules for OpenSpec.
+#
+# These are the kit's HARD conventions for the four OpenSpec-native artifacts
+# (proposal · spec · design · tasks). They are *additive* to OpenSpec's built-in
+# <template>/<instruction> — `openspec instructions <artifact>` emits them inside a
+# <rules> block, so the role agents (analyst/architect/developer) do NOT carry these
+# formats inline. Edit conventions HERE, in one place; the agents just run
+# `openspec instructions` and obey what it prints.
+#
+# Installed by `bin/init.mjs`: appended verbatim into the project's real
+# `openspec/config.yaml` (the `rules:` key) right after `openspec init`. The onboarder
+# fills the sibling `context:` key (project domain/stack/conventions) in Phase 4b.
+# Projects may extend any list with project-specific rules.
+
+rules:
+  # ── proposal.md (analyst S1) — WHY + scope. ACs/scenarios live in the spec deltas, not here. ──
+  proposal:
+    - "Pick a kebab-case change name that reflects the feature; carry the ticket id through every AC/BR/INT id."
+    - "Include a `## Non-Goals` section — state explicitly what is out of scope."
+    - "Include an `## Assumptions` section: tag each assumption with exactly one of [CONFIRMED] / [ASSUMED] / [MISSING] / [UNCLEAR]. Max 5 [UNCLEAR]/[MISSING] total."
+    - "Include an `## Edge Cases` section enumerating at least 10 edge cases by category (input boundary, state transition, concurrency, data integrity, permission, integration, UI/UX)."
+    - "Include an `## Early Risk Flags` section — fold in every STRIDE threat from the threat model (if run)."
+    - "Include a `Figma:` line with the design URL(s), or `Figma: N/A`."
+    - "If the feature ports logic from a legacy system, include a `## Legacy Implicit Behavior Audit` section labeling each behavior [CONTRACT] / [ACCIDENT] / [UNCLEAR] with a `file:line` citation."
+    - "Never write \"TBD\" / \"to be determined\" — if you cannot resolve something, tag it [MISSING] or [UNCLEAR] with a reason."
+
+  # ── spec deltas (analyst S2) — the testable ACs/scenarios under specs/<capability>/spec.md ──
+  spec:
+    - "Every acceptance criterion uses the id format AC-{ticket}-{NNN} (zero-padded 3 digits) and carries EXACTLY one tag: [CONFIRMED] / [ASSUMED] / [MISSING] / [UNCLEAR]. Wrong: AC-1, AC-1.1, AC-001, AC-69555-1."
+    - "Business rules use BR-{ticket}-{NNN}; integration points use INT-{ticket}-{NNN}. Never drop the ticket id."
+    - "At least 3 happy-path + 3 error-path scenarios per user story."
+    - "Every AC must be 100% testable by QA — concrete, observable outcome. No \"TBD\"."
+
+  # ── design.md (architect S3) — HOW. Additive to OpenSpec's generic design template. ──
+  design:
+    - "Start the document with `## Sketch — Gap Analysis`: either \"No critical gaps found\" or a list of gaps (STOP and recommend an S2 return on a critical gap)."
+    - "Reference the analyst's AC ids verbatim (AC-{ticket}-{NNN}). NEVER invent new AC ids."
+    - "Every major decision is an `### ADR-{NNN}` with: Context · Options (a markdown table of >=2 options with pros/cons) · Decision (chosen option + why) · Consequences. One option is not a decision."
+    - "Cover these sections beyond OpenSpec's defaults: Architecture Overview · API Design · DB Schema · Error Mapping · Sequence Flows · Edge Cases · Performance · Security · Risk Assessment."
+    - "End the document with `## Implementation Guide`: recommended task order, patterns to follow (with file paths), and gotchas."
+    - "If the change has an API, keep a SEPARATE openapi.yaml (OpenAPI 3.0.x) in the change dir; the design's API Design section and openapi.yaml must agree endpoint-for-endpoint."
+    - "Every rule deviation must be justified by an ADR citing the rule id + reason + spec evidence."
+
+  # ── tasks.md (architect S3 → developer S4 via /opsx:apply) — additive to OpenSpec's checkbox template. ──
+  tasks:
+    - "Every subtask line includes `File: \\`{path}\\`` (the exact file it touches) AND `_Requirements: AC-{ticket}-{NNN}_` (the AC ids it satisfies)."
+    - "Order tasks by dependency, following the project's layering: data/schema -> domain/business logic -> service -> interface/controller -> tests. Never put tests before the code they test."
+    - "At least 2 checkpoint tasks (one mid-build, one final); the LAST task is always a checkpoint. Recommended: a checkpoint every 3-5 implementation tasks."
+    - "Checkpoint tasks are human-review gates — never mark them optional (`*`). Required tasks have no `*`; optional tasks end with `*`."
