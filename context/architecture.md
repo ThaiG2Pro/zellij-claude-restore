@@ -57,7 +57,7 @@ No DB transactions. Consistency is filesystem-level:
 - `src/enrich.rs` — pure KDL-enrichment module (no `zellij-tile` dep): `enrich_claude_panes`,
   `enrich_nodes`, `neutralize_snap_pane`, `maybe_enrich_pane`, `resolve_cwd`, `pane_has_session_id`,
   `inject_session_id`, `basename`, `is_template_node`, the `SessionResolver` type alias, and an inline
-  `#[cfg(test)] mod tests` (33 unit tests run via `cargo test`).
+  `#[cfg(test)] mod tests` (40 unit tests run via `cargo test`).
 - `hooks/session-marker.py` — Claude Code `SessionStart` hook (marker writer).
 - `shell/snap.fish` · `snap.bash` · `snap.zsh` — user command helpers (`snap`/`snap-list`/`snap-load`).
 - `layouts/default.kdl.example` — optional resident-plugin layout (1-row borderless strip).

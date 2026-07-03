@@ -2820,7 +2820,7 @@ dependencies = [
 
 [[package]]
 name = "zellij-claude-sync"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "kdl 6.5.0",
  "serde",

@@ -1,8 +1,24 @@
 # zellij-claude-sync
 
+[![CI](https://github.com/ThaiG2Pro/zellij-claude-restore/actions/workflows/ci.yml/badge.svg)](https://github.com/ThaiG2Pro/zellij-claude-restore/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Zellij 0.44.2](https://img.shields.io/badge/Zellij-0.44.2-blue)
+
 Save a named **Zellij workspace snapshot** that captures the layout **plus the Claude Code
 chat session running in each pane** — so `zellij --layout <name>` after a reboot brings back
 the exact panes *and* resumes the exact Claude conversations.
+
+```console
+$ snap my-workspace
+✓ saved snapshot: my-workspace
+  2 claude pane(s) will resume · 0 already pinned · 0 without a marker
+
+# ... reboot ...
+
+$ zellij --layout my-workspace     # panes restored; both claude chats resume automatically
+```
+
+> A short recorded demo can be produced with [`docs/record-demo.sh`](docs/record-demo.sh).
 
 ## The problem it solves
 
@@ -40,7 +56,7 @@ right conversation.
 ## Install
 
 ```bash
-git clone <repo> zellij-claude-sync
+git clone https://github.com/ThaiG2Pro/zellij-claude-restore.git zellij-claude-sync
 cd zellij-claude-sync
 ./install.sh
 ```
@@ -83,13 +99,29 @@ Verify: start a fresh `claude` somewhere, then check
 ## Usage
 
 ```bash
-snap my-workspace          # save the current Zellij + Claude layout
-snap-list                  # list saved snapshots
+snap my-workspace              # save the current Zellij + Claude layout
+snap --manual my-workspace     # ...but restore panes suspended (wait for ENTER)
+snap-list                      # list saved snapshots
 zellij --layout my-workspace   # restore — claude panes resume via --resume
 ```
 
-On restore each command pane shows `Press ENTER to run: claude --resume <uuid>` (Zellij's
-default for dumped command panes); press ENTER to resume.
+`snap` prints what it captured, e.g.:
+
+```
+✓ saved snapshot: my-workspace
+  2 claude pane(s) will resume · 0 already pinned · 0 without a marker
+```
+
+**Auto-enter (default).** On restore, panes running `claude` that `snap` could pin
+resume **automatically** — no keypress. Only recognized-and-pinned claude panes
+auto-launch; every other command pane keeps Zellij's safe suspended default
+(`Press ENTER to run: …`), so restore never auto-runs an arbitrary command. Prefer
+the old behavior? Use `snap --manual <name>` (or set `ZCS_NO_AUTO_ENTER=1`) and each
+claude pane waits for ENTER too.
+
+**One-key snapshot.** Bind a key to snapshot without typing a name — see
+[`layouts/keybind.kdl.example`](layouts/keybind.kdl.example) (uses Zellij's
+`MessagePlugin` keybind action; restore with `zellij --layout quicksnap`).
 
 ## Notes & limitations
 
