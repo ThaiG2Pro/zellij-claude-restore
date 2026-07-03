@@ -1,13 +1,13 @@
-# zellij-claude-sync shell helpers (fish).
+# zellij-claude-restore shell helpers (fish).
 #
 # Install: symlink or copy this file into ~/.config/fish/conf.d/ so fish
 # auto-sources it at startup:
-#     ln -s (pwd)/shell/snap.fish ~/.config/fish/conf.d/zellij-claude-sync.fish
+#     ln -s (pwd)/shell/snap.fish ~/.config/fish/conf.d/zellij-claude-restore.fish
 #
 # Assumes the built plugin lives at the path in $ZCS_PLUGIN (override in your
 # environment if you deploy it elsewhere).
 
-set -q ZCS_PLUGIN; or set -g ZCS_PLUGIN ~/.config/zellij/plugins/zellij-claude-sync.wasm
+set -q ZCS_PLUGIN; or set -g ZCS_PLUGIN ~/.config/zellij/plugins/zellij-claude-restore.wasm
 
 function snap --description 'Save a Zellij + Claude workspace snapshot'
     # Usage: snap [--manual] <name>

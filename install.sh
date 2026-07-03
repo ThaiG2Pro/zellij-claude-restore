@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# zellij-claude-sync installer (hybrid: build from source if possible, else download a release).
+# zellij-claude-restore installer (hybrid: build from source if possible, else download a release).
 #
 # Usage:
 #   ./install.sh                 # auto: build if cargo+wasm target present, else download
@@ -9,7 +9,7 @@
 #   ZCS_VERSION=v0.1.0 ./install.sh   # release tag to download (default: latest)
 #
 # What it does:
-#   1. Puts zellij-claude-sync.wasm in ~/.config/zellij/plugins/
+#   1. Puts zellij-claude-restore.wasm in ~/.config/zellij/plugins/
 #   2. Pre-grants the plugin's ReadApplicationState/ChangeApplicationState permission
 #   3. Sources the snap helpers for your shell (fish/bash/zsh)
 #   4. Copies the SessionStart hook into ~/.claude/hooks/
@@ -25,7 +25,7 @@ MODE="${ZCS_MODE:-auto}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLUGIN_DIR="$HOME/.config/zellij/plugins"
-PLUGIN_PATH="$PLUGIN_DIR/zellij-claude-sync.wasm"
+PLUGIN_PATH="$PLUGIN_DIR/zellij-claude-restore.wasm"
 PERMS="$HOME/.cache/zellij/permissions.kdl"
 HOOK_SRC="$SCRIPT_DIR/hooks/session-marker.py"
 HOOK_DST="$HOME/.claude/hooks/zellij-claude-session-marker.py"
@@ -59,7 +59,7 @@ build_from_source() {
     fi
     say "Building plugin from source (cargo build --release --target wasm32-wasip1)"
     ( cd "$SCRIPT_DIR" && cargo build --release --target wasm32-wasip1 )
-    install -D -m 0644 "$SCRIPT_DIR/target/wasm32-wasip1/release/zellij-claude-sync.wasm" "$PLUGIN_PATH"
+    install -D -m 0644 "$SCRIPT_DIR/target/wasm32-wasip1/release/zellij-claude-restore.wasm" "$PLUGIN_PATH"
 }
 
 download_release() {
@@ -67,9 +67,9 @@ download_release() {
     command -v curl >/dev/null 2>&1 || die "curl not found"
     local url
     if [ "$VERSION" = latest ]; then
-        url="https://github.com/$REPO/releases/latest/download/zellij-claude-sync.wasm"
+        url="https://github.com/$REPO/releases/latest/download/zellij-claude-restore.wasm"
     else
-        url="https://github.com/$REPO/releases/download/$VERSION/zellij-claude-sync.wasm"
+        url="https://github.com/$REPO/releases/download/$VERSION/zellij-claude-restore.wasm"
     fi
     say "Downloading prebuilt plugin: $url"
     warn "Prebuilt .wasm targets zellij $ZELLIJ_TILE_PIN — if your zellij differs, build from source instead."
@@ -114,7 +114,7 @@ add_source_line() {  # $1 = rc file, $2 = helper file
     local rc="$1" helper="$2" line="source \"$helper\""
     [ -f "$rc" ] || return 1
     if ! grep -qF "$helper" "$rc"; then
-        printf '\n# zellij-claude-sync\n%s\n' "$line" >> "$rc"
+        printf '\n# zellij-claude-restore\n%s\n' "$line" >> "$rc"
         say "Added snap helpers to $rc"
     else
         say "snap helpers already sourced in $rc"
@@ -124,7 +124,7 @@ add_source_line() {  # $1 = rc file, $2 = helper file
 # fish: drop into conf.d (auto-sourced)
 if [ -d "$HOME/.config/fish" ] || command -v fish >/dev/null 2>&1; then
     mkdir -p "$HOME/.config/fish/conf.d"
-    ln -sf "$SCRIPT_DIR/shell/snap.fish" "$HOME/.config/fish/conf.d/zellij-claude-sync.fish"
+    ln -sf "$SCRIPT_DIR/shell/snap.fish" "$HOME/.config/fish/conf.d/zellij-claude-restore.fish"
     say "Linked fish helpers into ~/.config/fish/conf.d/"
 fi
 add_source_line "$HOME/.bashrc" "$SCRIPT_DIR/shell/snap.bash" || true

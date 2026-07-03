@@ -1,6 +1,6 @@
 [package]
-name = "zellij-claude-sync"
-version = "0.3.0"
+name = "zellij-claude-restore"
+version = "0.4.0"
 edition = "2024"
 
 # NOTE: zellij plugins are BINARY crates, not cdylib libs. register_plugin!

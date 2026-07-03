@@ -14,7 +14,7 @@ No HTTP API → no JSON success/error envelope. The relevant contracts are:
 - **Outcome / error reporting**: the plugin does NOT return a structured result — the `zellij pipe`
   CLI stays blocked and is killed by `timeout`. Success is confirmed by the **presence of the
   snapshot file** `~/.config/zellij/layouts/<name>.kdl`, not by an exit code or response body.
-  Diagnostics go to stderr via `eprintln!("[zellij-claude-sync] …")`.
+  Diagnostics go to stderr via `eprintln!("[zellij-claude-restore] …")`.
 
 ## HTTP Status Policy
 N/A — no HTTP layer, so no 2xx/4xx/5xx status codes are emitted or consumed. Failure signalling is
@@ -25,15 +25,15 @@ No URLs. Naming contracts that DO matter:
 - **Snapshot files**: `~/.config/zellij/layouts/<name>.kdl` (name = first positional arg to `snap`).
 - **Encoded cwd**: absolute cwd with every `/` replaced by `-` — matching Claude's own
   `~/.claude/projects/<encoded-cwd>/` scheme. Used in both the hook and `resolve_session_uuid`.
-- **WASM artifact basename** follows the package name with a **hyphen**: `zellij-claude-sync.wasm`
-  (the old cdylib underscore name `zellij_claude_sync.wasm` is stale — do not reference it).
+- **WASM artifact basename** follows the package name with a **hyphen**: `zellij-claude-restore.wasm`
+  (the old cdylib underscore name `zellij_claude_restore.wasm` is stale — do not reference it).
 
 ## Naming Conventions
 - **Rust**: `snake_case` functions/locals, `PascalCase` types, `SCREAMING_SNAKE_CASE` consts
   (e.g. `MARKER_DIR`). Standard rustfmt formatting.
 - **Shell helpers**: kebab-style user commands (`snap`, `snap-list`, `snap-load`); env override
   `ZCS_PLUGIN`; installer env vars prefixed `ZCS_` (`ZCS_MODE`, `ZCS_REPO`, `ZCS_VERSION`).
-- **Diagnostics**: every log line prefixed `[zellij-claude-sync]`.
+- **Diagnostics**: every log line prefixed `[zellij-claude-restore]`.
 - **Commits**: `<type>(<scope>): <subject>` (R-GIT-001; this repo has no ticket numbers, so the
   ticket-id segment is omitted — e.g. `fix: resume claude via --resume`).
 

@@ -76,7 +76,7 @@ pub fn enrich_layout(
         Ok(doc) => doc,
         Err(e) => {
             eprintln!(
-                "[zellij-claude-sync] KDL parse failed, saving raw layout: {}",
+                "[zellij-claude-restore] KDL parse failed, saving raw layout: {}",
                 e
             );
             return (
@@ -173,7 +173,7 @@ pub(crate) fn neutralize_snap_pane(node: &mut KdlNode) -> bool {
         .unwrap_or_default();
     let joined = args.join(" ");
     let is_snap = args.iter().any(|a| a == "save")
-        && (joined.contains("pipe") || joined.contains("zellij-claude-sync"));
+        && (joined.contains("pipe") || joined.contains("zellij-claude"));
     if !is_snap {
         return false;
     }
@@ -445,7 +445,7 @@ mod tests {
         // with start_suspended and close_on_exit child nodes (as dumped by zellij)
         let input = r#"layout {
     pane command="timeout" {
-        args "3" "zellij" "pipe" "--plugin" "file:/path/to/zellij-claude-sync.wasm" "--name" "save" "--" "snap"
+        args "3" "zellij" "pipe" "--plugin" "file:/path/to/zellij-claude-restore.wasm" "--name" "save" "--" "snap"
         start_suspended true
         close_on_exit true
     }
@@ -479,7 +479,7 @@ mod tests {
     fn snap_pane_zellij_basename_neutralized_ac_tests_011() {
         let input = r#"layout {
     pane command="zellij" {
-        args "pipe" "--plugin" "file:/path/zellij-claude-sync.wasm" "--name" "save" "--" "mysnap"
+        args "pipe" "--plugin" "file:/path/zellij-claude-restore.wasm" "--name" "save" "--" "mysnap"
         start_suspended true
     }
 }

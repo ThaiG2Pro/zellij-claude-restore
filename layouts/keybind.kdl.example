@@ -17,7 +17,7 @@ keybinds {
     shared_except "locked" {
         // Ctrl y → save a snapshot named "quicksnap"
         bind "Ctrl y" {
-            MessagePlugin "file:/home/YOU/.config/zellij/plugins/zellij-claude-sync.wasm" {
+            MessagePlugin "file:/home/YOU/.config/zellij/plugins/zellij-claude-restore.wasm" {
                 name "save"
                 payload "quicksnap"
             }

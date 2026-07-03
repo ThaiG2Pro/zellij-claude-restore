@@ -29,7 +29,7 @@ jobs:
       - name: Publish release with the .wasm asset
         uses: softprops/action-gh-release@v2
         with:
-          files: target/wasm32-wasip1/release/zellij-claude-sync.wasm
+          files: target/wasm32-wasip1/release/zellij-claude-restore.wasm
           body: |
-            Prebuilt `zellij-claude-sync.wasm` for **zellij 0.44.x** (zellij-tile =0.44.2).
+            Prebuilt `zellij-claude-restore.wasm` for **zellij 0.44.x** (zellij-tile =0.44.2).
             If your zellij version differs, build from source instead (`ZCS_MODE=build ./install.sh`).

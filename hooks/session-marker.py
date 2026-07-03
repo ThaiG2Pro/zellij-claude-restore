@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Claude Code SessionStart hook for zellij-claude-sync.
+"""Claude Code SessionStart hook for zellij-claude-restore.
 
 Records the current Claude session UUID in a cwd-keyed marker file that the
-zellij-claude-sync WASM plugin reads when it enriches a saved layout.
+zellij-claude-restore WASM plugin reads when it enriches a saved layout.
 
 Why this exact path:
     The plugin runs inside a WASI sandbox where guest ``/tmp`` is mapped to the

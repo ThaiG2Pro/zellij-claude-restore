@@ -1,12 +1,12 @@
-# zellij-claude-sync shell helpers (bash).
+# zellij-claude-restore shell helpers (bash).
 #
 # Install: source this file from ~/.bashrc, e.g.
-#     echo 'source /path/to/zellij-claude-sync/shell/snap.bash' >> ~/.bashrc
+#     echo 'source /path/to/zellij-claude-restore/shell/snap.bash' >> ~/.bashrc
 # (install.sh does this for you.)
 #
 # Override $ZCS_PLUGIN if you deploy the plugin somewhere else.
 
-: "${ZCS_PLUGIN:=$HOME/.config/zellij/plugins/zellij-claude-sync.wasm}"
+: "${ZCS_PLUGIN:=$HOME/.config/zellij/plugins/zellij-claude-restore.wasm}"
 
 # Save a Zellij + Claude workspace snapshot.
 # Usage: snap [--manual] <name>

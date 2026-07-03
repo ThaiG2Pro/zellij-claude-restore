@@ -1,8 +1,8 @@
 # Project Context
 
 ## Identity
-- **Name**: zellij-claude-sync
-- **Slug**: zellij-claude-sync
+- **Name**: zellij-claude-restore
+- **Slug**: zellij-claude-restore
 - **One-liner**: A Zellij plugin (Rust → WASM) that saves a named workspace snapshot capturing the layout plus the Claude Code chat session running in each pane, so `zellij --layout <name>` resumes the exact layout and re-opens the exact Claude conversations after a reboot.
 
 ## Domain

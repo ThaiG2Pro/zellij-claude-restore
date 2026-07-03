@@ -1,4 +1,4 @@
-# Contributing to zellij-claude-sync
+# Contributing to zellij-claude-restore
 
 Thanks for taking a look! This is a small, focused tool — a Zellij WASM plugin plus a
 Claude `SessionStart` hook and shell helpers. Contributions are welcome; the notes below
@@ -22,7 +22,7 @@ rustup target add wasm32-wasip1
 cargo test                                   # 40 host unit tests
 cargo fmt --check
 cargo clippy --all-targets -- -D warnings
-cargo build --release --target wasm32-wasip1 # artifact: target/…/zellij-claude-sync.wasm
+cargo build --release --target wasm32-wasip1 # artifact: target/…/zellij-claude-restore.wasm
 ```
 
 CI runs exactly these four on every push and PR — run them locally before opening a PR.
@@ -34,8 +34,8 @@ is no host outside Zellij. After a plugin change, verify end-to-end in a **fresh
 Zellij session (not a reattach), purging the per-session wasm cache first:
 
 ```bash
-find ~/.cache/zellij -type d -name 'zellij-claude-sync.wasm' -prune -exec rm -rf {} +
-cp target/wasm32-wasip1/release/zellij-claude-sync.wasm ~/.config/zellij/plugins/
+find ~/.cache/zellij -type d -name 'zellij-claude-restore.wasm' -prune -exec rm -rf {} +
+cp target/wasm32-wasip1/release/zellij-claude-restore.wasm ~/.config/zellij/plugins/
 # then, in a new zellij session with a claude pane running:
 snap round-trip && zellij --layout round-trip   # confirm the conversation resumes
 ```

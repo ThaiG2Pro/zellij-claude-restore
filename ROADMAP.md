@@ -1,6 +1,6 @@
 # Roadmap
 
-Where `zellij-claude-sync` is headed. Items are grouped by how likely they are to
+Where `zellij-claude-restore` is headed. Items are grouped by how likely they are to
 land soon — nothing here is a promise, and PRs that pick any of these up are welcome
 (see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
 

@@ -1,4 +1,4 @@
-// OPTIONAL: keep zellij-claude-sync resident in every session.
+// OPTIONAL: keep zellij-claude-restore resident in every session.
 //
 // The `snap` fish function launches the plugin on demand (`zellij pipe --plugin …`),
 // so this is NOT required. Use it only if you'd rather the plugin already be loaded
@@ -18,7 +18,7 @@ layout {
     //   auto_enter "false"          → restore claude panes suspended by default
     //   claude_command "claude-code" → treat a renamed binary as claude
     pane size=1 borderless=true {
-        plugin location="file:/home/YOU/.config/zellij/plugins/zellij-claude-sync.wasm" {
+        plugin location="file:/home/YOU/.config/zellij/plugins/zellij-claude-restore.wasm" {
             // auto_enter "true"
             // claude_command "claude"
         }

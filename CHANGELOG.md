@@ -6,6 +6,20 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-07-03
+
+### Changed
+- **Renamed the project `zellij-claude-sync` → `zellij-claude-restore`** to match the
+  repository. This changes the built artifact and default install path:
+  - artifact: `zellij-claude-sync.wasm` → **`zellij-claude-restore.wasm`**
+  - default plugin path / `$ZCS_PLUGIN`: `~/.config/zellij/plugins/zellij-claude-restore.wasm`
+  - diagnostics prefix: `[zellij-claude-restore]`
+
+  **Upgrading from ≤0.3.0:** re-run `install.sh` (or copy the new `.wasm`), update any
+  resident-plugin layout's `plugin location=…` path, re-`source` the shell helpers, and
+  remove the old `~/.config/zellij/plugins/zellij-claude-sync.wasm`. Environment variables
+  are unchanged (still `ZCS_*`). Snapshot files and the marker/hook contract are unchanged.
+
 ## [0.3.0] — 2026-07-03
 
 ### Added
@@ -53,7 +67,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   tagged-release CI workflow.
 - Pure KDL-enrichment module (`src/enrich.rs`) with a 33-test regression suite.
 
-[Unreleased]: https://github.com/ThaiG2Pro/zellij-claude-restore/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/ThaiG2Pro/zellij-claude-restore/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/ThaiG2Pro/zellij-claude-restore/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ThaiG2Pro/zellij-claude-restore/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ThaiG2Pro/zellij-claude-restore/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/ThaiG2Pro/zellij-claude-restore/releases/tag/v0.1.0

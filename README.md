@@ -1,4 +1,4 @@
-# zellij-claude-sync
+# zellij-claude-restore
 
 [![CI](https://github.com/ThaiG2Pro/zellij-claude-restore/actions/workflows/ci.yml/badge.svg)](https://github.com/ThaiG2Pro/zellij-claude-restore/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -27,7 +27,7 @@ Zellij's resurrection replays each pane's command from `/proc/<pid>/cmdline`. A 
 conversation is lost. argv is immutable after `execve()`, so the running session ID can't be
 recovered from the process afterward.
 
-`zellij-claude-sync` fixes this by enriching the saved layout: for every pane running `claude`
+`zellij-claude-restore` fixes this by enriching the saved layout: for every pane running `claude`
 it injects `args "--resume" "<session-uuid>"`, looked up from a per-cwd marker that a Claude
 `SessionStart` hook writes. On restore each pane runs `claude --resume <uuid>` and re-opens the
 right conversation.
@@ -35,7 +35,7 @@ right conversation.
 ## How it works
 
 ```
- Claude SessionStart hook            zellij-claude-sync.wasm (on `snap`)
+ Claude SessionStart hook            zellij-claude-restore.wasm (on `snap`)
  ──────────────────────              ───────────────────────────────────
  writes /tmp/zellij-<uid>/           dump layout KDL ─► for each `claude` pane,
  claude-sessions/<cwd>.session  ──►  look up its cwd's marker ─► inject
@@ -56,8 +56,8 @@ right conversation.
 ## Install
 
 ```bash
-git clone https://github.com/ThaiG2Pro/zellij-claude-restore.git zellij-claude-sync
-cd zellij-claude-sync
+git clone https://github.com/ThaiG2Pro/zellij-claude-restore.git zellij-claude-restore
+cd zellij-claude-restore
 ./install.sh
 ```
 
@@ -66,11 +66,11 @@ available, otherwise downloads a prebuilt release. Force either path:
 
 ```bash
 ZCS_MODE=build ./install.sh                  # always compile locally
-ZCS_REPO=user/zellij-claude-sync ZCS_MODE=download ./install.sh   # fetch a release .wasm
+ZCS_REPO=user/zellij-claude-restore ZCS_MODE=download ./install.sh   # fetch a release .wasm
 ```
 
 It will:
-1. Install the plugin to `~/.config/zellij/plugins/zellij-claude-sync.wasm`
+1. Install the plugin to `~/.config/zellij/plugins/zellij-claude-restore.wasm`
 2. Pre-grant the plugin's permissions in `~/.cache/zellij/permissions.kdl`
 3. Source the `snap` helpers for fish / bash / zsh
 4. Copy the SessionStart hook to `~/.claude/hooks/`
@@ -146,8 +146,8 @@ that runs claude as an *argument* (`npx claude`) is not detected.
 
 ```bash
 cargo build --release --target wasm32-wasip1
-# artifact: target/wasm32-wasip1/release/zellij-claude-sync.wasm
-cp target/wasm32-wasip1/release/zellij-claude-sync.wasm ~/.config/zellij/plugins/
+# artifact: target/wasm32-wasip1/release/zellij-claude-restore.wasm
+cp target/wasm32-wasip1/release/zellij-claude-restore.wasm ~/.config/zellij/plugins/
 ```
 
 This is a **binary** crate (not a cdylib) — Zellij's loader needs the WASM `_start` export that

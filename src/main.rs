@@ -101,18 +101,21 @@ impl ZellijPlugin for State {
                     match save_layout(&name, &enriched, true) {
                         Ok(()) => {
                             eprintln!(
-                                "[zellij-claude-sync] saved '{}' — {} enriched, {} already pinned, {} missing marker",
+                                "[zellij-claude-restore] saved '{}' — {} enriched, {} already pinned, {} missing marker",
                                 name, stats.enriched, stats.already_pinned, stats.missing_marker
                             );
                             write_status(&name, &stats, true);
                         }
                         Err(e) => {
-                            eprintln!("[zellij-claude-sync] save_layout('{}') failed: {}", name, e);
+                            eprintln!(
+                                "[zellij-claude-restore] save_layout('{}') failed: {}",
+                                name, e
+                            );
                             write_status(&name, &stats, false);
                         }
                     }
                 }
-                Err(e) => eprintln!("[zellij-claude-sync] dump_session_layout failed: {}", e),
+                Err(e) => eprintln!("[zellij-claude-restore] dump_session_layout failed: {}", e),
             }
             // NOTE: the save above is synchronous and complete by this point, but the
             // `zellij pipe` CLI call stays blocked (it waits for plugin output that

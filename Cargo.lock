@@ -2819,8 +2819,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "zellij-claude-sync"
-version = "0.3.0"
+name = "zellij-claude-restore"
+version = "0.4.0"
 dependencies = [
  "kdl 6.5.0",
  "serde",
