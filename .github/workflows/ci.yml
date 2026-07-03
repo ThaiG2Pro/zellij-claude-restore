@@ -1,0 +1,30 @@
+name: CI
+
+# Run build, format check, lint, and tests on every push and pull_request.
+# Separate from release.yml (which only triggers on v* tags).
+
+on: [push, pull_request]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust + wasm32-wasip1 target
+        run: |
+          rustup update stable
+          rustup default stable
+          rustup target add wasm32-wasip1
+
+      - name: Build plugin (binary crate → emits _start)
+        run: cargo build --release --target wasm32-wasip1
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+      - name: Lint (clippy -D warnings)
+        run: cargo clippy -- -D warnings
+
+      - name: Run tests
+        run: cargo test
