@@ -111,7 +111,11 @@ fi
 
 # --- 3. shell helpers -----------------------------------------------------
 add_source_line() {  # $1 = rc file, $2 = helper file
-    local rc="$1" helper="$2" line="source \"$helper\""
+    # NOTE: assign `line` on its own statement — a single `local a=$1 b=$2 c=$b`
+    # expands all RHS before any assignment, so referencing $helper here would be
+    # an unbound-variable error under `set -u`.
+    local rc="$1" helper="$2"
+    local line="source \"$helper\""
     [ -f "$rc" ] || return 1
     if ! grep -qF "$helper" "$rc"; then
         printf '\n# zellij-claude-restore\n%s\n' "$line" >> "$rc"
