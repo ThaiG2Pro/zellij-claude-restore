@@ -41,6 +41,12 @@ lets `enrich.rs` drop the `zellij-tile` dep and run under `cargo test`. The host
 - **Self-neutralization** — `neutralize_snap_pane()` detects the pane that ran the `snap` command and
   strips its `command`/`args` (plus the `start_suspended`/`close_on_exit` child nodes) so restore
   doesn't re-run `snap` and hang.
+- **Stray stdio-pane neutralization** — `neutralize_stdio_pane()` catches a different case: Zellij
+  derives a dumped pane's `command` from its *current foreground process*, so a pane whose real job is
+  an interactive shell can get captured running a transient MCP/LSP subprocess an agent/editor spawned
+  in it (e.g. `npm exec figma-developer-mcp --stdio`). Detected by the literal `--stdio` arg and
+  stripped via the same shared `strip_command_pane()` helper, since such processes can never be
+  meaningfully resumed from a bare terminal replay.
 
 ## Transaction & Consistency
 No DB transactions. Consistency is filesystem-level:
@@ -55,9 +61,10 @@ No DB transactions. Consistency is filesystem-level:
   `register_plugin!` entry, and `resolve_session_uuid` (marker file read). All `#[cfg(not(test))]`-gated
   except the resolver; delegates the KDL work to `enrich`.
 - `src/enrich.rs` — pure KDL-enrichment module (no `zellij-tile` dep): `enrich_claude_panes`,
-  `enrich_nodes`, `neutralize_snap_pane`, `maybe_enrich_pane`, `resolve_cwd`, `pane_has_session_id`,
+  `enrich_nodes`, `neutralize_snap_pane`, `neutralize_stdio_pane`, `strip_command_pane`,
+  `maybe_enrich_pane`, `resolve_cwd`, `pane_has_session_id`,
   `inject_session_id`, `basename`, `is_template_node`, the `SessionResolver` type alias, and an inline
-  `#[cfg(test)] mod tests` (43 unit tests run via `cargo test`).
+  `#[cfg(test)] mod tests` (47 unit tests run via `cargo test`).
 - `hooks/session-marker.py` — Claude Code `SessionStart` hook (marker writer).
 - `shell/snap.fish` · `snap.bash` · `snap.zsh` — user command helpers (`snap`/`snap-list`/`snap-load`).
 - `layouts/default.kdl.example` — optional resident-plugin layout (1-row borderless strip).

@@ -6,6 +6,20 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.3] — 2026-07-06
+
+### Fixed
+- **A plain terminal pane could restore as a hung MCP/LSP process.** Zellij determines a
+  dumped pane's `command` from its *current foreground process*, not what the user
+  originally typed — so a pane whose real job is an interactive shell (`cd`, `ls`, `git
+  status`, …) could get captured mid-snapshot running a transient `--stdio` subprocess an
+  agent/editor spawned in it (e.g. `npm exec figma-developer-mcp --stdio`, `node
+  …/typescript-language-server --stdio`). Those processes speak JSON-RPC over stdio to one
+  specific parent and can never be usefully resumed from a bare terminal, so they're now
+  neutralized the same way the snap pane is: `command`/`args`/`start_suspended` stripped,
+  restoring as a plain shell. Detected by the literal `--stdio` arg. (Found via a real
+  snapshot with Figma/TS-language-server MCP panes.)
+
 ## [0.4.2] — 2026-07-06
 
 ### Fixed
@@ -84,7 +98,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   tagged-release CI workflow.
 - Pure KDL-enrichment module (`src/enrich.rs`) with a 33-test regression suite.
 
-[Unreleased]: https://github.com/ThaiG2Pro/zellij-claude-restore/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/ThaiG2Pro/zellij-claude-restore/compare/v0.4.3...HEAD
+[0.4.3]: https://github.com/ThaiG2Pro/zellij-claude-restore/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/ThaiG2Pro/zellij-claude-restore/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/ThaiG2Pro/zellij-claude-restore/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/ThaiG2Pro/zellij-claude-restore/compare/v0.3.0...v0.4.0

@@ -129,7 +129,11 @@ pub(crate) fn enrich_nodes(
         let name = node.name().value().to_string();
         let entering_template = in_template || is_template_node(&name);
 
-        if !entering_template && name == "pane" && !neutralize_snap_pane(node) {
+        if !entering_template
+            && name == "pane"
+            && !neutralize_snap_pane(node)
+            && !neutralize_stdio_pane(node)
+        {
             maybe_enrich_pane(node, scope_base.as_deref(), cfg, resolve, stats);
         }
 
@@ -177,8 +181,45 @@ pub(crate) fn neutralize_snap_pane(node: &mut KdlNode) -> bool {
     if !is_snap {
         return false;
     }
-    // Drop `command` and every property that is only valid alongside a command
-    // (zellij rejects e.g. `start_suspended` on a command-less pane).
+    strip_command_pane(node);
+    true
+}
+
+/// Zellij determines a dumped pane's `command` by inspecting the pane's *current
+/// foreground process*, not the command the user originally typed. A pane whose
+/// real purpose is an interactive shell (`cd`, `ls`, `git status`, …) can get
+/// captured mid-dump running a transient MCP/LSP subprocess an editor or agent
+/// spawned in it — e.g. `npm exec figma-developer-mcp --stdio` or
+/// `node …/typescript-language-server --stdio`. Such processes speak JSON-RPC over
+/// stdio to one specific parent and can never be meaningfully resumed from a bare
+/// terminal replay, so treat them like the snap pane: strip `command`/`args` back
+/// to a plain shell. Detected by the literal `--stdio` arg — a flag specific to
+/// this class of process; ordinary interactive commands don't take it. Returns
+/// true if the pane was neutralized.
+pub(crate) fn neutralize_stdio_pane(node: &mut KdlNode) -> bool {
+    if node.entry("command").is_none() {
+        return false;
+    }
+    let has_stdio_flag = node
+        .children()
+        .and_then(|doc| doc.nodes().iter().find(|n| n.name().value() == "args"))
+        .map(|n| {
+            n.entries()
+                .iter()
+                .any(|e| e.value().as_string() == Some("--stdio"))
+        })
+        .unwrap_or(false);
+    if !has_stdio_flag {
+        return false;
+    }
+    strip_command_pane(node);
+    true
+}
+
+/// Drop `command` and every property/child that is only valid alongside a command
+/// (zellij rejects e.g. `start_suspended` on a command-less pane), leaving the
+/// pane's `cwd`/`size`/`focus` etc. intact so it restores as a plain shell.
+fn strip_command_pane(node: &mut KdlNode) {
     node.entries_mut().retain(|e| {
         !matches!(
             e.name().map(|n| n.value()),
@@ -193,7 +234,6 @@ pub(crate) fn neutralize_snap_pane(node: &mut KdlNode) -> bool {
             )
         });
     }
-    true
 }
 
 fn maybe_enrich_pane(
@@ -517,6 +557,104 @@ mod tests {
         assert!(
             result.contains("start_suspended"),
             "AC-tests-012: non-snap zellij pane must keep start_suspended"
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Stray MCP/LSP stdio pane neutralization — Jul 6 regression. Zellij captures
+    // a dumped pane's `command` from its *current foreground process*, so a pane
+    // whose real purpose is a plain interactive shell can be dumped mid-snapshot
+    // running a transient `--stdio` subprocess spawned in it. Fixtures below are
+    // the exact blocks from a real user snapshot (npm exec figma-developer-mcp,
+    // node typescript-language-server).
+    // -------------------------------------------------------------------------
+    #[test]
+    fn npm_exec_stdio_pane_neutralized_to_plain_shell() {
+        let input = r#"layout {
+    pane command="npm" cwd="portal" size="51%" {
+        args "exec" "figma-developer-mcp" "--stdio"
+        start_suspended true
+    }
+}
+"#;
+        let result = enrich_claude_panes(input, &resolver_some());
+        assert!(
+            !result.contains("command=\"npm\""),
+            "stray npm --stdio pane must have its command stripped"
+        );
+        assert!(
+            !result.contains("figma-developer-mcp"),
+            "stray npm --stdio pane must have its args stripped"
+        );
+        assert!(
+            !result.contains("start_suspended"),
+            "stray npm --stdio pane must have start_suspended stripped (command-less panes reject it)"
+        );
+        assert!(
+            result.contains("cwd=\"portal\""),
+            "cwd/size must survive neutralization"
+        );
+    }
+
+    #[test]
+    fn node_language_server_stdio_pane_neutralized_to_plain_shell() {
+        let input = r#"layout {
+    pane command="node" cwd="kiro-sdlc-kit" {
+        args "/home/thaivro/.local/share/mise/installs/node/24.15.0/bin/typescript-language-server" "--stdio"
+        start_suspended true
+    }
+}
+"#;
+        let result = enrich_claude_panes(input, &resolver_some());
+        assert!(
+            !result.contains("command=\"node\""),
+            "stray node --stdio pane must have its command stripped"
+        );
+        assert!(
+            !result.contains("typescript-language-server"),
+            "stray node --stdio pane must have its args stripped"
+        );
+    }
+
+    #[test]
+    fn command_pane_without_stdio_flag_is_untouched() {
+        // Same shape, but no `--stdio` arg — a real, legitimately-restorable command
+        // pane must NOT be neutralized just because it happens to be command="node".
+        let input = r#"layout {
+    pane command="node" cwd="api" {
+        args "server.js"
+        start_suspended true
+    }
+}
+"#;
+        let result = enrich_claude_panes(input, &resolver_some());
+        assert!(
+            result.contains("command=\"node\""),
+            "a command pane with no --stdio flag must keep its command"
+        );
+        assert!(
+            result.contains("start_suspended"),
+            "a command pane with no --stdio flag must keep start_suspended"
+        );
+    }
+
+    #[test]
+    fn stray_stdio_pane_inside_template_is_left_alone() {
+        // Template subtrees describe what to spawn for a brand-new tab — never
+        // rewrite them, even if a pane inside looks like a stray stdio process.
+        let input = r#"layout {
+    new_tab_template {
+        pane command="npm" {
+            args "exec" "figma-developer-mcp" "--stdio"
+            start_suspended true
+        }
+    }
+}
+"#;
+        let result = enrich_claude_panes(input, &resolver_some());
+        assert!(
+            result.contains("command=\"npm\""),
+            "stdio pane inside a template subtree must not be neutralized"
         );
     }
 
