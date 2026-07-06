@@ -63,11 +63,18 @@ impl ZellijPlugin for State {
 
     fn pipe(&mut self, pipe_message: PipeMessage) -> bool {
         if pipe_message.name == "save" {
-            let name = pipe_message
+            // A single `zellij pipe … --name save -- <name>` delivers `pipe()` TWICE:
+            // once with the payload and once empty. Treat an empty/whitespace payload as
+            // a no-op so we don't also save a stray `unnamed.kdl` (a snapshot has no
+            // useful nameless form — the shell + keybind always pass one).
+            let name = match pipe_message
                 .payload
                 .map(|p| p.trim().to_string())
                 .filter(|p| !p.is_empty())
-                .unwrap_or_else(|| "unnamed".to_string());
+            {
+                Some(n) => n,
+                None => return false,
+            };
 
             // Auto-enter (drop `start_suspended` on the claude panes we pin, so they
             // resume without a manual ENTER) is ON by default — that's the whole point

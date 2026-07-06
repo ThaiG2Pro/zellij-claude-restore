@@ -6,6 +6,15 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.2] — 2026-07-06
+
+### Fixed
+- **Stray `unnamed.kdl` on every snapshot.** A single `zellij pipe … --name save --
+  <name>` delivers `pipe()` twice — once with the payload, once empty — so alongside the
+  real snapshot the plugin also saved an `unnamed.kdl` (and the status file reported
+  `"name":"unnamed"`). An empty/whitespace payload is now a no-op. (Found via an
+  end-to-end round-trip; the pure unit tests can't see the host pipe path.)
+
 ## [0.4.1] — 2026-07-06
 
 ### Fixed
@@ -75,7 +84,8 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   tagged-release CI workflow.
 - Pure KDL-enrichment module (`src/enrich.rs`) with a 33-test regression suite.
 
-[Unreleased]: https://github.com/ThaiG2Pro/zellij-claude-restore/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/ThaiG2Pro/zellij-claude-restore/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/ThaiG2Pro/zellij-claude-restore/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/ThaiG2Pro/zellij-claude-restore/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/ThaiG2Pro/zellij-claude-restore/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ThaiG2Pro/zellij-claude-restore/compare/v0.2.0...v0.3.0
